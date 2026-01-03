@@ -14,22 +14,13 @@ This app uses `phockup` to ingest media. Please install it on your system:
 
 ### MacOS
 
-The reliable way to install Phockup is to clone the repository and set up a local virtual environment (since it's not a standard package):
+The Homebrew formula for phockup is currently broken. Please use `pipx` to install it reliably:
 
 ```bash
-# 1. Clone the repository to a hidden folder in your home directory
-git clone https://github.com/ivandokov/phockup.git ~/.phockup
+# 1. Install pipx (if not already installed)
+brew install pipx
+pipx ensurepath
 
-# 2. Enter the directory
-cd ~/.phockup
-
-# 3. Create a virtual environment and install dependencies
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# 4. Create a symlink to make it executable globally
-# (This assumes ~/.local/bin is in your PATH, which pipx likely verified)
-mkdir -p ~/.local/bin
-ln -s ~/.phockup/phockup.py ~/.local/bin/phockup
+# 2. Install phockup from source
+pipx install git+https://github.com/ivandokov/phockup.git
 ```

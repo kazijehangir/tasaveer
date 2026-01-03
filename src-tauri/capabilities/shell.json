@@ -15,6 +15,16 @@
                     "args": true
                 }
             ]
+        },
+        {
+            "identifier": "shell:allow-spawn",
+            "allow": [
+                {
+                    "name": "phockup",
+                    "cmd": "phockup",
+                    "args": true
+                }
+            ]
         }
     ]
 }
