@@ -40,9 +40,9 @@ export function AppLayout() {
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-purple-600/10 pointer-events-none" />
 
         <div className="relative z-10 px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-row items-center justify-between">
             {/* Branding */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-row items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg">
                 <span className="text-xl font-bold">T</span>
               </div>
@@ -53,7 +53,7 @@ export function AppLayout() {
             </div>
 
             {/* Navigation */}
-            <nav className="flex items-center gap-3">
+            <nav className="flex flex-row items-center gap-3">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;

@@ -1,4 +1,4 @@
-import { FolderOpen, Server, Key, Package, CheckCircle2, XCircle } from "lucide-react";
+import { FolderOpen, Server, Key, Package, XCircle } from "lucide-react";
 
 export function Settings() {
   return (
