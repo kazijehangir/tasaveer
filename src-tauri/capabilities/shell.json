@@ -1,7 +1,7 @@
 {
     "$schema": "../gen/schemas/desktop-schema.json",
     "identifier": "shell-allow-phockup",
-    "description": "Allow execution of phockup and immich-go commands",
+    "description": "Allow execution of phockup and immich-go commands (PATH and bundled sidecar)",
     "windows": [
         "main"
     ],
@@ -28,6 +28,11 @@
                     "name": "immich-go.exe",
                     "cmd": "immich-go.exe",
                     "args": true
+                },
+                {
+                    "name": "binaries/immich-go",
+                    "sidecar": true,
+                    "args": true
                 }
             ]
         },
@@ -52,6 +57,11 @@
                 {
                     "name": "immich-go.exe",
                     "cmd": "immich-go.exe",
+                    "args": true
+                },
+                {
+                    "name": "binaries/immich-go",
+                    "sidecar": true,
                     "args": true
                 }
             ]

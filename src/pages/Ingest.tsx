@@ -12,6 +12,9 @@ export function Ingest() {
   const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [destPath, setDestPath] = useState<string | null>(null);
   const [defaultArchivePath, setDefaultArchivePath] = useState<string | null>(null);
+  // Custom binary paths from settings
+  const [phockupPath, setPhockupPath] = useState<string>('');
+  const [immichGoPath, setImmichGoPath] = useState<string>('');
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLogsExpanded, setIsLogsExpanded] = useState(false);
@@ -58,6 +61,13 @@ export function Ingest() {
           if (settings.archivePath) {
             setDefaultArchivePath(settings.archivePath);
             setDestPath(settings.archivePath);
+          }
+          // Load custom binary paths
+          if (settings.phockupPath) {
+            setPhockupPath(settings.phockupPath);
+          }
+          if (settings.immichGoPath) {
+            setImmichGoPath(settings.immichGoPath);
           }
         }
       } catch (err) {
@@ -130,7 +140,10 @@ export function Ingest() {
     try {
       // Local (Phockup) Workflow
       if (ingestType === 'local') {
-        const phockupCmd = navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup';
+        // Use custom path if set, otherwise try PATH
+        const phockupCmd = phockupPath
+          ? phockupPath
+          : (navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup');
 
         const runPhockup = () => {
           return new Promise<void>(async (resolve, reject) => {
@@ -143,6 +156,7 @@ export function Ingest() {
             }
 
             logBufferRef.current.push(`Starting local ingest with ${threads} threads...`);
+            logBufferRef.current.push(`Using phockup: ${phockupCmd}`);
 
             const command = Command.create(phockupCmd, args);
             await spawnAndTrack(command, resolve, reject);
@@ -175,9 +189,25 @@ export function Ingest() {
 
         logBufferRef.current.push(`Starting ${ingestType} import using immich-go...`);
 
-        const immichGoCmd = navigator.platform.toLowerCase().includes('win') ? 'immich-go.exe' : 'immich-go';
         const args = ['archive', typeArg, '--write-to-folder', destPath, ...targetFiles];
-        const command = Command.create(immichGoCmd, args);
+        let command: Command<string>;
+
+        // Priority: custom path > bundled sidecar > PATH
+        if (immichGoPath) {
+          logBufferRef.current.push(`Using custom immich-go: ${immichGoPath}`);
+          command = Command.create(immichGoPath, args);
+        } else {
+          // Try bundled sidecar first
+          try {
+            logBufferRef.current.push('Using bundled immich-go sidecar...');
+            command = Command.sidecar('binaries/immich-go', args);
+          } catch (e) {
+            // Fallback to PATH
+            logBufferRef.current.push('Bundled sidecar not found, trying PATH...');
+            const immichGoCmd = navigator.platform.toLowerCase().includes('win') ? 'immich-go.exe' : 'immich-go';
+            command = Command.create(immichGoCmd, args);
+          }
+        }
 
         await new Promise<void>(async (resolve, reject) => {
           await spawnAndTrack(command, resolve, reject);

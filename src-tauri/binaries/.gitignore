@@ -1,0 +1,7 @@
+# Ignore downloaded binaries (they're fetched by scripts)
+immich-go-*
+phockup-*
+
+# Keep the directory structure
+!.gitignore
+!README.md

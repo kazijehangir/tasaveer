@@ -13,9 +13,15 @@ Tasaveer is a media ingestion tool for photographers and videographers. It simpl
 
 ## Installation and Prerequisites
 
-### Prerequisites
+### Bundled Dependencies
 
-This app uses `phockup` to ingest media. Please install it on your system.
+Tasaveer comes with **immich-go bundled** for Google Photos and iCloud imports. No additional installation is required for these features.
+
+### Phockup (Required for Local Ingest)
+
+For local media ingestion (from SD cards, folders, etc.), you need to install `phockup`. This cannot be bundled due to its Python + ExifTool dependencies.
+
+> **Upstream Repository**: [ivandokov/phockup](https://github.com/ivandokov/phockup)
 
 #### MacOS
 
@@ -63,30 +69,19 @@ pipx install git+https://github.com/ivandokov/phockup.git
    phockup --version
    ```
 
-### Immich-Go
+### Custom Binary Paths
 
-To upload media to your Immich server, you need `immich-go`.
+You can override the bundled or PATH binaries with your own custom installations in **Settings → Advanced: Custom Binary Paths**. This is useful if you want to:
+- Use a specific version of immich-go
+- Point to phockup installed in a non-standard location
 
-#### MacOS / Linux
+### External Dependencies Reference
 
-1. Download the latest release from the [GitHub Release Page](https://github.com/simulot/immich-go/releases).
-2. Rename the binary to `immich-go` and `chmod +x` it.
-3. Place it in a folder included in your system PATH (e.g., `/usr/local/bin`).
-
-#### Windows
-
-Run the following in PowerShell:
-
-```powershell
-# Download and extract immich-go
-Invoke-WebRequest -Uri "https://github.com/simulot/immich-go/releases/latest/download/immich-go_Windows_x86_64.zip" -OutFile "$env:TEMP\immich-go.zip"
-Expand-Archive -Path "$env:TEMP\immich-go.zip" -DestinationPath "$env:LOCALAPPDATA\Programs\immich-go" -Force
-
-# Add to PATH
-[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:LOCALAPPDATA\Programs\immich-go", [EnvironmentVariableTarget]::User)
-```
-
-Restart your terminal, then verify with `immich-go version`.
+| Tool | Bundled | Repository |
+|------|---------|------------|
+| **immich-go** | ✅ Yes | [simulot/immich-go](https://github.com/simulot/immich-go) |
+| **phockup** | ❌ No (requires Python) | [ivandokov/phockup](https://github.com/ivandokov/phockup) |
+| **ExifTool** | ❌ No (required by phockup) | [exiftool.org](https://exiftool.org/) |
 
 ## Developing Guide
 
