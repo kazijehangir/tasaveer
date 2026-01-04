@@ -118,6 +118,27 @@ export function Settings() {
     }
   };
 
+  const [connectionStatus, setConnectionStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
+
+  const handleTestConnection = async () => {
+    if (!settings.immichUrl || !settings.immichApiKey) {
+      setConnectionStatus({ type: 'error', message: "Please enter both URL and API Key." });
+      return;
+    }
+
+    setConnectionStatus({ type: 'idle', message: 'Testing connection...' });
+
+    try {
+      const result = await invoke<string>("validate_immich", {
+        url: settings.immichUrl,
+        apiKey: settings.immichApiKey
+      });
+      setConnectionStatus({ type: 'success', message: result });
+    } catch (err) {
+      setConnectionStatus({ type: 'error', message: err as string });
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in max-w-4xl pb-20">
       {/* Header */}
@@ -312,9 +333,22 @@ export function Settings() {
             </div>
           </div>
 
-          <button className="btn-secondary w-full mt-4 opacity-50 cursor-not-allowed">
-            Test Connection (Coming Soon)
-          </button>
+          <div className="flex items-center gap-4 mt-4">
+            <button
+              onClick={handleTestConnection}
+              className="btn-secondary whitespace-nowrap"
+              disabled={connectionStatus.message === 'Testing connection...'}
+            >
+              {connectionStatus.message === 'Testing connection...' ? 'Testing...' : 'Test Connection'}
+            </button>
+
+            {connectionStatus.message && connectionStatus.message !== 'Testing connection...' && (
+              <div className={`text-sm flex items-center gap-2 ${connectionStatus.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                {connectionStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                {connectionStatus.message}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

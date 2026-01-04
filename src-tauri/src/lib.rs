@@ -43,13 +43,51 @@ fn find_zips(path: String) -> Result<Vec<String>, String> {
     Ok(zips)
 }
 
+#[tauri::command]
+fn validate_immich(url: String, api_key: String) -> Result<String, String> {
+    let client = reqwest::blocking::Client::new();
+    
+    // 1. Clean up URL (remove trailing slash)
+    let base_url = url.trim_end_matches('/');
+
+    // 2. Check Ping (validates URL)
+    let ping_url = format!("{}/api/server-info/ping", base_url);
+    match client.get(&ping_url).send() {
+        Ok(res) => {
+            if !res.status().is_success() && res.status() != reqwest::StatusCode::NOT_FOUND {
+                 // Ignore 404s for ping as some versions hide it, but log others?
+                 // For now, proceed to Auth check as the ultimate truth.
+            }
+        },
+        Err(e) => return Err(format!("Could not reach server at {}. Error: {}", base_url, e)),
+    }
+
+    // 3. Check Auth (validates API Key)
+    // This is the real test. If this passes, everything is good.
+    let auth_url = format!("{}/api/users/me", base_url);
+    let auth_res = client.get(&auth_url)
+        .header("x-api-key", &api_key)
+        .header("Accept", "application/json")
+        .send()
+        .map_err(|e| format!("Network error during auth: {}", e))?;
+
+    let status = auth_res.status();
+    if status.is_success() {
+        Ok("Connected successfully!".to_string())
+    } else {
+        // Capture the body to understand the 404 or error
+        let body = auth_res.text().unwrap_or_else(|_| "<no body>".to_string());
+        Err(format!("Authentication failed at {}. Status: {}.\nResponse: {}", auth_url, status, body))
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, load_settings, save_settings, find_zips])
+        .invoke_handler(tauri::generate_handler![greet, load_settings, save_settings, find_zips, validate_immich])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
