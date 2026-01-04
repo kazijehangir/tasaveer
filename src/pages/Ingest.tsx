@@ -1,17 +1,37 @@
 import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp, XCircle } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { Command } from "@tauri-apps/plugin-shell";
 
 export function Ingest() {
   const [selectedStrategy, setSelectedStrategy] = useState<'copy' | 'move'>('copy');
   const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [destPath, setDestPath] = useState<string | null>(null);
+  const [defaultArchivePath, setDefaultArchivePath] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLogsExpanded, setIsLogsExpanded] = useState(false);
   const runningCommandsRef = useRef<Array<{ kill: () => Promise<void> }>>([]);
   const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    async function loadDefaults() {
+      try {
+        const settingsStr = await invoke<string>("load_settings");
+        if (settingsStr) {
+          const settings = JSON.parse(settingsStr);
+          if (settings.archivePath) {
+            setDefaultArchivePath(settings.archivePath);
+            setDestPath(settings.archivePath);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      }
+    }
+    loadDefaults();
+  }, []);
 
   const handleSelectSource = async () => {
     try {
@@ -254,7 +274,12 @@ export function Ingest() {
                     <FolderOpen className="w-5 h-5" />
                   </div>
                   <div className="truncate">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Destination</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Destination</p>
+                        {destPath === defaultArchivePath && (
+                          <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">Default</span>
+                        )}
+                      </div>
                     <p className="text-sm font-medium truncate" title={destPath}>{destPath}</p>
                   </div>
                 </div>

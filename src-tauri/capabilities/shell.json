@@ -13,6 +13,11 @@
                     "name": "phockup",
                     "cmd": "phockup",
                     "args": true
+                },
+                {
+                    "name": "immich-go",
+                    "cmd": "immich-go",
+                    "args": true
                 }
             ]
         },
@@ -22,6 +27,11 @@
                 {
                     "name": "phockup",
                     "cmd": "phockup",
+                    "args": true
+                },
+                {
+                    "name": "immich-go",
+                    "cmd": "immich-go",
                     "args": true
                 }
             ]

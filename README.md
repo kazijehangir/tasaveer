@@ -30,6 +30,14 @@ pipx ensurepath
 pipx install git+https://github.com/ivandokov/phockup.git
 ```
 
+### Immich-Go
+
+To upload media to your Immich server, you need `immich-go`.
+
+1. Download the latest release from the [GitHub Release Page](https://github.com/simulot/immich-go/releases).
+2. Rename the binary to `immich-go` (and `chmod +x` it if on Mac/Linux).
+3. Place it in a folder included in your system PATH (e.g., `/usr/local/bin`).
+
 ## Developing Guide
 
 This template should help get you started developing with Tauri, React and Typescript in Vite.
