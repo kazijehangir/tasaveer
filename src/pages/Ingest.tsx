@@ -273,7 +273,6 @@ export function Ingest() {
   const spawnAndTrack = (command: Command<string>, resolve: (val?: void) => void, reject: (err: any) => void) => {
     return new Promise<void>(async (internalResolve) => {
       let child: any = null;
-      let cancelled = false;
 
       command.on('close', (data: { code: number | null, signal: number | null }) => {
         if (cancelledRef.current) return;
@@ -307,7 +306,6 @@ export function Ingest() {
         child = await command.spawn();
         addToLogs(`Child process spawned. PID: ${child.pid}`);
         if (cancelledRef.current) {
-          cancelled = true;
           await child.kill();
           reject(new Error('Cancelled'));
           internalResolve();
