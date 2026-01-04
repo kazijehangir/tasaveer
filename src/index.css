@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 @layer base {
   :root {
@@ -75,8 +73,9 @@
 }
 
 @layer components {
-  /* Glass card effect */
-  .glass-card {
+  /* Glass card effect - shared properties */
+  .glass-card,
+  .glass-card-hover {
     background: rgba(30, 41, 59, 0.5);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -85,12 +84,7 @@
   }
   
   .glass-card-hover {
-    background: rgba(30, 41, 59, 0.5);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(148, 163, 184, 0.1);
-    border-radius: 1rem;
-    @apply transition-all duration-300;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .glass-card-hover:hover {

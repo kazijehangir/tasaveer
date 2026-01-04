@@ -4,7 +4,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Ingest } from "./pages/Ingest";
 import { Sync } from "./pages/Sync";
 import { Settings } from "./pages/Settings";
-import "./App.css";
+
 
 function App() {
   return (

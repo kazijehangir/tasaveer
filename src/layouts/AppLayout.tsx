@@ -35,7 +35,7 @@ export function AppLayout() {
   return (
     <div className="flex flex-col h-screen bg-slate-900 text-white">
       {/* Horizontal Navigation Bar */}
-      <header className="glass-card border-b border-slate-700/50 relative">
+      <header className="relative border-b border-slate-700/50 backdrop-blur-xl bg-slate-800/50">
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-purple-600/10 pointer-events-none" />
 
