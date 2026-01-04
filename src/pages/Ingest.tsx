@@ -101,7 +101,7 @@ export function Ingest() {
       if (ingestType === 'local') {
         const runPhockup = (type: 'image' | 'video') => {
           return new Promise<void>(async (resolve, reject) => {
-            const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--progress', '--file-type', type];
+            const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '--file-type', type];
 
             if (selectedStrategy === 'move') {
               args.push('--move');
