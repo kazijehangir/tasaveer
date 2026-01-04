@@ -20,6 +20,11 @@
                     "args": true
                 },
                 {
+                    "name": "phockup.exe",
+                    "cmd": "phockup.exe",
+                    "args": true
+                },
+                {
                     "name": "immich-go",
                     "cmd": "immich-go",
                     "args": true
@@ -47,6 +52,11 @@
                 {
                     "name": "phockup.bat",
                     "cmd": "phockup.bat",
+                    "args": true
+                },
+                {
+                    "name": "phockup.exe",
+                    "cmd": "phockup.exe",
                     "args": true
                 },
                 {

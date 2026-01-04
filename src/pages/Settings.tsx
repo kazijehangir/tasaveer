@@ -84,7 +84,7 @@ export function Settings() {
 
     // Check Phockup in PATH - try multiple command variants for Windows compatibility
     if (!phockupFound) {
-      for (const cmdName of ['phockup', 'phockup.bat'] as const) {
+      for (const cmdName of ['phockup', 'phockup.bat', 'phockup.exe'] as const) {
         if (phockupFound) break;
         try {
           const phockupCmd = Command.create(cmdName, ['--help']);

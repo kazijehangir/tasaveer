@@ -38,8 +38,9 @@ export function Ingest() {
     } else {
       // Flush remaining
       if (logBufferRef.current.length > 0) {
-        setLogs(prev => [...prev, ...logBufferRef.current]);
+        const remaining = [...logBufferRef.current];
         logBufferRef.current = [];
+        setLogs(prev => [...prev, ...remaining]);
       }
       if (flushIntervalRef.current) {
         clearInterval(flushIntervalRef.current);
@@ -51,6 +52,16 @@ export function Ingest() {
       if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);
     };
   }, [status]);
+
+  const addToLogs = (msg: string) => {
+    console.log('[Ingest]', msg);
+    logBufferRef.current.push(msg);
+    // If not running (e.g. error state), flush immediately to ensure visibility
+    if (status !== 'running') {
+      setLogs(prev => [...prev, msg]);
+      logBufferRef.current = []; // Clear buffer since we just flushed
+    }
+  };
 
   useEffect(() => {
     async function loadDefaults() {
@@ -112,7 +123,11 @@ export function Ingest() {
     setLogs(prev => [...prev, 'Canceling operations...']); // Immediate feedback
     cancelledRef.current = true;
 
-    for (const cmd of runningCommandsRef.current) {
+    // Copy the array because 'close' handlers will mutate runningCommandsRef.current
+    const processesToKill = [...runningCommandsRef.current];
+    runningCommandsRef.current = []; // Clear immediately to prevent further handling
+
+    for (const cmd of processesToKill) {
       try {
         await cmd.kill();
         logBufferRef.current.push('Killed running process.');
@@ -122,7 +137,6 @@ export function Ingest() {
       }
     }
 
-    runningCommandsRef.current = [];
     logBufferRef.current.push('Operation canceled by user.');
     setStatus('idle');
   };
@@ -137,13 +151,30 @@ export function Ingest() {
     runningCommandsRef.current = [];
     cancelledRef.current = false;
 
+    addToLogs('Initializing ingest process...');
+
+    // Validate paths before starting
+    if (navigator.platform.toLowerCase().includes('win') && destPath.startsWith('/')) {
+      const errorMsg = `Invalid destination path format for Windows: ${destPath}. Please select a drive (e.g. C:\\...)`;
+      addToLogs(errorMsg);
+      setStatus('error');
+      setLogs(prev => [...prev, errorMsg]);
+      return;
+    }
+
     try {
       // Local (Phockup) Workflow
       if (ingestType === 'local') {
+        addToLogs(`Source: ${sourcePath}`);
+        addToLogs(`Destination: ${destPath}`);
+
         // Use custom path if set, otherwise try PATH
+        // On Windows, phockup installed via pip is often a .bat file
         const phockupCmd = phockupPath
           ? phockupPath
           : (navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup');
+
+        addToLogs(`Phockup Binary: ${phockupCmd}`);
 
         const runPhockup = () => {
           return new Promise<void>(async (resolve, reject) => {
@@ -155,10 +186,17 @@ export function Ingest() {
               args.push('--move');
             }
 
-            logBufferRef.current.push(`Starting local ingest with ${threads} threads...`);
-            logBufferRef.current.push(`Using phockup: ${phockupCmd}`);
+            addToLogs(`Starting local ingest with ${threads} threads...`);
+            addToLogs(`Command: ${phockupCmd} ${args.join(' ')}`);
 
-            const command = Command.create(phockupCmd, args);
+            let command;
+            try {
+              command = Command.create(phockupCmd, args);
+            } catch (e) {
+              addToLogs(`Failed to create command: ${e}`);
+              throw e;
+            }
+
             await spawnAndTrack(command, resolve, reject);
           });
         };
@@ -168,46 +206,49 @@ export function Ingest() {
       }
       // Immich-Go Workflows
       else {
+        addToLogs(`Starting ${ingestType} import...`);
         const typeArg = ingestType === 'google-photos' ? 'from-google-photos' : 'from-icloud';
         let targetFiles: string[] = [];
 
         try {
-          logBufferRef.current.push(`Scanning ${sourcePath} for zip files...`);
+          addToLogs(`Scanning ${sourcePath} for zip files...`);
           const foundZips = await invoke<string[]>('find_zips', { path: sourcePath });
           if (foundZips && foundZips.length > 0) {
             targetFiles = foundZips;
-            logBufferRef.current.push(`Found ${foundZips.length} zip files.`);
+            addToLogs(`Found ${foundZips.length} zip files.`);
           } else {
-            logBufferRef.current.push(`No zip files found in ${sourcePath}. Passing folder path directly.`);
+            addToLogs(`No zip files found in ${sourcePath}. Passing folder path directly.`);
             targetFiles = [sourcePath];
           }
         } catch (e) {
           console.error("Failed to scan for zips:", e);
-          logBufferRef.current.push(`Failed to scan for zips: ${e}. Using folder path.`);
+          addToLogs(`Failed to scan for zips: ${e}. Using folder path.`);
           targetFiles = [sourcePath];
         }
 
-        logBufferRef.current.push(`Starting ${ingestType} import using immich-go...`);
+        addToLogs(`Starting ${ingestType} import using immich-go...`);
 
         const args = ['archive', typeArg, '--write-to-folder', destPath, ...targetFiles];
         let command: Command<string>;
 
         // Priority: custom path > bundled sidecar > PATH
         if (immichGoPath) {
-          logBufferRef.current.push(`Using custom immich-go: ${immichGoPath}`);
+          addToLogs(`Using custom immich-go: ${immichGoPath}`);
           command = Command.create(immichGoPath, args);
         } else {
           // Try bundled sidecar first
           try {
-            logBufferRef.current.push('Using bundled immich-go sidecar...');
+            addToLogs('Using bundled immich-go sidecar...');
             command = Command.sidecar('binaries/immich-go', args);
           } catch (e) {
             // Fallback to PATH
-            logBufferRef.current.push('Bundled sidecar not found, trying PATH...');
+            addToLogs(`Bundled sidecar not found (${e}), trying PATH...`);
             const immichGoCmd = navigator.platform.toLowerCase().includes('win') ? 'immich-go.exe' : 'immich-go';
             command = Command.create(immichGoCmd, args);
           }
         }
+
+        addToLogs(`Command created. Spawning...`);
 
         await new Promise<void>(async (resolve, reject) => {
           await spawnAndTrack(command, resolve, reject);
@@ -216,13 +257,15 @@ export function Ingest() {
 
       if (!cancelledRef.current) {
         setStatus('success');
-        logBufferRef.current.push(`All operations completed!`);
+        addToLogs(`All operations completed!`);
       }
 
     } catch (err) {
+      console.error('Ingest failed:', err);
       if (!cancelledRef.current) {
         setStatus('error');
-        logBufferRef.current.push(`Failed to execute ingest: ${err}`);
+        // Force update logs immediately
+        setLogs(prev => [...prev, `Failed to execute ingest: ${err}`]);
       }
     }
   };
@@ -233,34 +276,36 @@ export function Ingest() {
       let cancelled = false;
 
       command.on('close', (data: { code: number | null, signal: number | null }) => {
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
 
         if (data.code === 0) {
           resolve();
         } else if (data.code === null) {
-          logBufferRef.current.push(`Process terminated.`);
+          addToLogs(`Process terminated.`);
           resolve();
         } else {
-          logBufferRef.current.push(`Process exited with code ${data.code}`);
-          resolve();
+          addToLogs(`Process exited with code ${data.code}`);
+          reject(new Error(`Process exited with code ${data.code}`));
         }
         internalResolve();
       });
 
       command.on('error', (error: any) => {
-        if (cancelled) return;
+        if (cancelledRef.current) return;
         if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
-        logBufferRef.current.push(`Process error: ${error}`);
+        addToLogs(`Process error events: ${error}`);
         reject(error);
         internalResolve();
       });
 
-      command.stdout.on('data', (line: string) => !cancelled && logBufferRef.current.push(line));
-      command.stderr.on('data', (line: string) => !cancelled && logBufferRef.current.push(line));
+      command.stdout.on('data', (line: string) => !cancelledRef.current && addToLogs(line));
+      command.stderr.on('data', (line: string) => !cancelledRef.current && addToLogs(line));
 
       try {
+        addToLogs('Spawning child process...');
         child = await command.spawn();
+        addToLogs(`Child process spawned. PID: ${child.pid}`);
         if (cancelledRef.current) {
           cancelled = true;
           await child.kill();
@@ -270,7 +315,8 @@ export function Ingest() {
         }
         runningCommandsRef.current.push(child);
       } catch (err) {
-        logBufferRef.current.push(`Failed to spawn process: ${err}`);
+        console.error('Spawn failed:', err);
+        addToLogs(`Failed to spawn process: ${err}`);
         reject(err);
         internalResolve();
       }
