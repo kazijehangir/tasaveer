@@ -1,5 +1,5 @@
-import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp, XCircle } from "lucide-react";
+import { useState, useRef } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Command } from "@tauri-apps/plugin-shell";
 
@@ -10,6 +10,8 @@ export function Ingest() {
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLogsExpanded, setIsLogsExpanded] = useState(false);
+  const runningCommandsRef = useRef<Array<{ kill: () => Promise<void> }>>([]);
+  const cancelledRef = useRef(false);
 
   const handleSelectSource = async () => {
     try {
@@ -41,12 +43,34 @@ export function Ingest() {
     }
   };
 
+  const handleCancel = async () => {
+    setLogs(prev => [...prev, 'Canceling operations...']);
+    cancelledRef.current = true;
+
+    // Kill all running commands
+    for (const cmd of runningCommandsRef.current) {
+      try {
+        await cmd.kill();
+        setLogs(prev => [...prev, 'Killed running process.']);
+      } catch (err) {
+        console.error('Failed to kill command:', err);
+        setLogs(prev => [...prev, `Failed to kill process: ${err}`]);
+      }
+    }
+
+    runningCommandsRef.current = [];
+    setLogs(prev => [...prev, 'Operation canceled by user.']);
+    setStatus('idle'); // Reset to idle so user can start again
+  };
+
   const handleIngest = async () => {
     if (!sourcePath || !destPath) return;
 
     setStatus('running');
     setLogs([]);
     setIsLogsExpanded(true); // Auto-expand logs to show progress of multiple steps
+    runningCommandsRef.current = []; // Reset commands
+    cancelledRef.current = false; // Reset cancellation flag
 
     try {
       // Helper to spawn phockup with specific file type
@@ -62,9 +86,23 @@ export function Ingest() {
 
           const command = Command.create('phockup', args);
 
+          let cancelled = false;
+          let child: Awaited<ReturnType<typeof command.spawn>> | null = null;
+
           command.on('close', (data) => {
+            if (cancelled) return;
+
+            // Remove this command from the running list
+            if (child) {
+              runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
+            }
+
             if (data.code === 0) {
               setLogs(prev => [...prev, `Finished ${type}s successfully.`]);
+              resolve();
+            } else if (data.code === null) {
+              // Process was killed (e.g., by cancel button)
+              setLogs(prev => [...prev, `Process for ${type}s was terminated.`]);
               resolve();
             } else {
               setLogs(prev => [...prev, `Process for ${type}s exited with code ${data.code}`]);
@@ -76,32 +114,68 @@ export function Ingest() {
           });
 
           command.on('error', (error) => {
+            if (cancelled) return;
+
+            // Remove this command from the running list
+            if (child) {
+              runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
+            }
+
             setLogs(prev => [...prev, `Error processing ${type}s: ${error}`]);
             reject(error);
           });
 
           command.stdout.on('data', (line) => {
+            if (cancelled) return;
             setLogs(prev => [...prev, line]);
           });
 
           command.stderr.on('data', (line) => {
+            if (cancelled) return;
             setLogs(prev => [...prev, line]);
           });
 
-          await command.spawn();
+          try {
+            child = await command.spawn();
+
+            // Check if we were cancelled while spawning
+            if (cancelledRef.current) {
+              cancelled = true;
+              await child.kill();
+              reject(new Error('Cancelled'));
+              return;
+            }
+
+            runningCommandsRef.current.push(child);
+          } catch (err) {
+            setLogs(prev => [...prev, `Failed to spawn process for ${type}s: ${err}`]);
+            reject(err);
+          }
         });
       };
 
       // Run sequentially
       await runPhockup('image');
+
+      // Check if we should continue
+      if (cancelledRef.current) {
+        return;
+      }
+
       await runPhockup('video');
 
-      setStatus('success');
-      setLogs(prev => [...prev, `All operations completed!`]);
+      // Only set success if we're still running (not cancelled)
+      if (!cancelledRef.current) {
+        setStatus('success');
+        setLogs(prev => [...prev, `All operations completed!`]);
+      }
 
     } catch (err) {
-      setStatus('error');
-      setLogs(prev => [...prev, `Failed to execute ingest: ${err}`]);
+      // Only update status if not cancelled
+      if (!cancelledRef.current) {
+        setStatus('error');
+        setLogs(prev => [...prev, `Failed to execute ingest: ${err}`]);
+      }
     }
   };
 
@@ -314,6 +388,16 @@ export function Ingest() {
                 </>
               )}
             </button>
+
+            {status === 'running' && (
+              <button
+                onClick={handleCancel}
+                className="btn-secondary w-full mt-4 text-lg py-4 flex items-center justify-center gap-3 border-red-500/30 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 hover:text-red-300"
+              >
+                <XCircle className="w-5 h-5" />
+                Cancel
+              </button>
+            )}
           </div>
         </div>
       </div>
