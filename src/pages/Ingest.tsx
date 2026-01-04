@@ -1,10 +1,13 @@
-import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp, XCircle } from "lucide-react";
+import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp, XCircle, Image, Cloud, Archive } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { Command } from "@tauri-apps/plugin-shell";
 
+type IngestType = 'local' | 'google-photos' | 'icloud';
+
 export function Ingest() {
+  const [ingestType, setIngestType] = useState<IngestType>('local');
   const [selectedStrategy, setSelectedStrategy] = useState<'copy' | 'move'>('copy');
   const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [destPath, setDestPath] = useState<string | null>(null);
@@ -36,9 +39,10 @@ export function Ingest() {
   const handleSelectSource = async () => {
     try {
       const selected = await open({
-        directory: true,
+        directory: true, // Always select directories now
         multiple: false,
         title: "Select Source Folder",
+        // No filters needed for directories
       });
       if (selected) {
         setSourcePath(selected as string);
@@ -88,115 +92,127 @@ export function Ingest() {
 
     setStatus('running');
     setLogs([]);
-    setIsLogsExpanded(true); // Auto-expand logs to show progress of multiple steps
-    runningCommandsRef.current = []; // Reset commands
-    cancelledRef.current = false; // Reset cancellation flag
+    setIsLogsExpanded(true);
+    runningCommandsRef.current = [];
+    cancelledRef.current = false;
 
     try {
-      // Helper to spawn phockup with specific file type
-      const runPhockup = (type: 'image' | 'video') => {
-        return new Promise<void>(async (resolve, reject) => {
-          const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--progress', '--file-type', type];
+      // Local (Phockup) Workflow
+      if (ingestType === 'local') {
+        const runPhockup = (type: 'image' | 'video') => {
+          return new Promise<void>(async (resolve, reject) => {
+            const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--progress', '--file-type', type];
 
-          if (selectedStrategy === 'move') {
-            args.push('--move');
+            if (selectedStrategy === 'move') {
+              args.push('--move');
+            }
+
+            setLogs(prev => [...prev, `Starting local ingest for ${type}s...`]);
+
+            const command = Command.create('phockup', args);
+            await spawnAndTrack(command, resolve, reject);
+          });
+        };
+
+        await runPhockup('image');
+        if (!cancelledRef.current) await runPhockup('video');
+      }
+      // Immich-Go Workflows
+      else {
+        const typeArg = ingestType === 'google-photos' ? 'from-google-photos' : 'from-icloud';
+
+        let targetFiles: string[] = [];
+
+        try {
+          // Find zips in the source folder
+          setLogs(prev => [...prev, `Scanning ${sourcePath} for zip files...`]);
+          const foundZips = await invoke<string[]>('find_zips', { path: sourcePath });
+          if (foundZips && foundZips.length > 0) {
+            targetFiles = foundZips;
+            setLogs(prev => [...prev, `Found ${foundZips.length} zip files.`]);
+          } else {
+            setLogs(prev => [...prev, `No zip files found in ${sourcePath}. Passing folder path directly.`]);
+            targetFiles = [sourcePath];
           }
+        } catch (e) {
+          console.error("Failed to scan for zips:", e);
+          setLogs(prev => [...prev, `Failed to scan for zips: ${e}. Using folder path.`]);
+          targetFiles = [sourcePath];
+        }
 
-          setLogs(prev => [...prev, `Starting ingest for ${type}s...`]);
+        setLogs(prev => [...prev, `Starting ${ingestType} import using immich-go...`]);
 
-          const command = Command.create('phockup', args);
+        // Pass all target files as arguments
+        const args = ['archive', typeArg, '--write-to-folder', destPath, ...targetFiles];
+        const command = Command.create('immich-go', args);
 
-          let cancelled = false;
-          let child: Awaited<ReturnType<typeof command.spawn>> | null = null;
-
-          command.on('close', (data) => {
-            if (cancelled) return;
-
-            // Remove this command from the running list
-            if (child) {
-              runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
-            }
-
-            if (data.code === 0) {
-              setLogs(prev => [...prev, `Finished ${type}s successfully.`]);
-              resolve();
-            } else if (data.code === null) {
-              // Process was killed (e.g., by cancel button)
-              setLogs(prev => [...prev, `Process for ${type}s was terminated.`]);
-              resolve();
-            } else {
-              setLogs(prev => [...prev, `Process for ${type}s exited with code ${data.code}`]);
-              // We don't necessarily want to reject here if one fails, maybe? 
-              // But for now let's assume strict success needed.
-              // Actually, if no images found it might exit 0? 
-              resolve();
-            }
-          });
-
-          command.on('error', (error) => {
-            if (cancelled) return;
-
-            // Remove this command from the running list
-            if (child) {
-              runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
-            }
-
-            setLogs(prev => [...prev, `Error processing ${type}s: ${error}`]);
-            reject(error);
-          });
-
-          command.stdout.on('data', (line) => {
-            if (cancelled) return;
-            setLogs(prev => [...prev, line]);
-          });
-
-          command.stderr.on('data', (line) => {
-            if (cancelled) return;
-            setLogs(prev => [...prev, line]);
-          });
-
-          try {
-            child = await command.spawn();
-
-            // Check if we were cancelled while spawning
-            if (cancelledRef.current) {
-              cancelled = true;
-              await child.kill();
-              reject(new Error('Cancelled'));
-              return;
-            }
-
-            runningCommandsRef.current.push(child);
-          } catch (err) {
-            setLogs(prev => [...prev, `Failed to spawn process for ${type}s: ${err}`]);
-            reject(err);
-          }
+        await new Promise<void>(async (resolve, reject) => {
+          await spawnAndTrack(command, resolve, reject);
         });
-      };
-
-      // Run sequentially
-      await runPhockup('image');
-
-      // Check if we should continue
-      if (cancelledRef.current) {
-        return;
       }
 
-      await runPhockup('video');
-
-      // Only set success if we're still running (not cancelled)
       if (!cancelledRef.current) {
         setStatus('success');
         setLogs(prev => [...prev, `All operations completed!`]);
       }
 
     } catch (err) {
-      // Only update status if not cancelled
       if (!cancelledRef.current) {
         setStatus('error');
         setLogs(prev => [...prev, `Failed to execute ingest: ${err}`]);
       }
     }
+  };
+
+  // Helper to spawn command and track it
+  const spawnAndTrack = (command: Command<string>, resolve: (val?: void) => void, reject: (err: any) => void) => {
+    return new Promise<void>(async (internalResolve) => {
+      let child: any = null;
+      let cancelled = false;
+
+      command.on('close', (data: { code: number | null, signal: number | null }) => {
+        if (cancelled) return;
+        if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
+
+        if (data.code === 0) {
+              resolve();
+            } else if (data.code === null) {
+          setLogs(prev => [...prev, `Process terminated.`]);
+              resolve();
+            } else {
+          setLogs(prev => [...prev, `Process exited with code ${data.code}`]);
+          resolve(); // Don't fail the whole chain on one non-zero exit? Or maybe we should.
+            }
+        internalResolve();
+      });
+
+      command.on('error', (error: any) => {
+            if (cancelled) return;
+        if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
+        setLogs(prev => [...prev, `Process error: ${error}`]);
+            reject(error);
+        internalResolve();
+      });
+
+      command.stdout.on('data', (line: string) => !cancelled && setLogs(prev => [...prev, line]));
+      command.stderr.on('data', (line: string) => !cancelled && setLogs(prev => [...prev, line]));
+
+      try {
+        child = await command.spawn();
+            if (cancelledRef.current) {
+              cancelled = true;
+              await child.kill();
+              reject(new Error('Cancelled'));
+              internalResolve();
+              return;
+            }
+            runningCommandsRef.current.push(child);
+      } catch (err) {
+        setLogs(prev => [...prev, `Failed to spawn process: ${err}`]);
+            reject(err);
+        internalResolve();
+      }
+    });
   };
 
   return (
@@ -217,18 +233,46 @@ export function Ingest() {
           <div className="glass-card p-8">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">1</span>
-              Select Source
+              Source Type
             </h2>
+
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <button
+                onClick={() => { setIngestType('local'); setSourcePath(null); }}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'local' ? 'bg-purple-500/20 border-purple-500 text-purple-200' : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}`}
+              >
+                <HardDrive className="w-5 h-5" />
+                <span className="text-xs font-semibold">Local</span>
+              </button>
+              <button
+                onClick={() => { setIngestType('google-photos'); setSourcePath(null); }}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'google-photos' ? 'bg-blue-500/20 border-blue-500 text-blue-200' : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}`}
+              >
+                <Image className="w-5 h-5" />
+                <span className="text-xs font-semibold">Google</span>
+              </button>
+              <button
+                onClick={() => { setIngestType('icloud'); setSourcePath(null); }}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'icloud' ? 'bg-blue-500/20 border-blue-500 text-blue-200' : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}`}
+              >
+                <Cloud className="w-5 h-5" />
+                <span className="text-xs font-semibold">iCloud</span>
+              </button>
+            </div>
 
             {!sourcePath ? (
               <div className="grid grid-cols-1 gap-4">
                 <button onClick={handleSelectSource} className="group flex items-center gap-4 p-6 rounded-xl bg-gradient-to-r from-slate-800/50 to-slate-800/30 border border-slate-700 hover:border-purple-500/50 transition-all hover:scale-[1.02]">
                   <div className="p-3 rounded-lg bg-purple-500/20 group-hover:bg-purple-500/30 transition-colors">
-                    <HardDrive className="w-6 h-6 text-purple-400" />
+                    {ingestType === 'local' ? <FolderOpen className="w-6 h-6 text-purple-400" /> : <Archive className="w-6 h-6 text-purple-400" />}
                   </div>
                   <div className="text-left">
-                    <h3 className="font-semibold text-lg text-white">Browse Folder</h3>
-                    <p className="text-sm text-slate-400">Select source directory</p>
+                    <h3 className="font-semibold text-lg text-white">
+                      {ingestType === 'local' ? 'Browse Folder' : 'Select Takeout Folder'}
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      {ingestType === 'local' ? 'Select source directory' : 'Select folder containing zips'}
+                    </p>
                   </div>
                 </button>
               </div>
@@ -290,68 +334,84 @@ export function Ingest() {
             )}
           </div>
 
-          {/* Import Strategy */}
-          <div className="glass-card p-8">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">3</span>
-              Import Strategy
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setSelectedStrategy('copy')}
-                style={selectedStrategy === 'copy' ? {
-                  backgroundColor: 'rgba(168, 85, 247, 0.1)', // purple-500/10
-                  borderColor: 'rgba(168, 85, 247, 1)',       // purple-500
-                } : {}}
-                className={`group relative z-10 cursor-pointer flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${selectedStrategy === 'copy'
-                  ? '' // Handled by style
-                  : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
-                  }`}
-              >
-                <div className={`p-2 rounded-lg transition-colors ${selectedStrategy === 'copy'
-                  ? 'bg-purple-500/20'
-                  : 'bg-slate-700 group-hover:bg-slate-600'
-                  }`}>
-                  <Copy className={`w-5 h-5 ${selectedStrategy === 'copy' ? 'text-purple-400' : 'text-slate-400'
-                    }`} />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="font-semibold text-base text-white mb-1">Copy</h3>
-                  <p className="text-xs text-slate-400">
-                    Keeps original files (safe)
-                  </p>
-                </div>
-              </button>
+          {/* Import Strategy (Only for Local) */}
+          {ingestType === 'local' && (
+            <div className="glass-card p-8">
+              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">3</span>
+                Import Strategy
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setSelectedStrategy('copy')}
+                  style={selectedStrategy === 'copy' ? {
+                    backgroundColor: 'rgba(168, 85, 247, 0.1)', // purple-500/10
+                    borderColor: 'rgba(168, 85, 247, 1)',       // purple-500
+                  } : {}}
+                  className={`group relative z-10 cursor-pointer flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${selectedStrategy === 'copy'
+                    ? '' // Handled by style
+                    : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
+                    }`}
+                >
+                  <div className={`p-2 rounded-lg transition-colors ${selectedStrategy === 'copy'
+                    ? 'bg-purple-500/20'
+                    : 'bg-slate-700 group-hover:bg-slate-600'
+                    }`}>
+                    <Copy className={`w-5 h-5 ${selectedStrategy === 'copy' ? 'text-purple-400' : 'text-slate-400'
+                      }`} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="font-semibold text-base text-white mb-1">Copy</h3>
+                    <p className="text-xs text-slate-400">
+                      Keeps original files (safe)
+                    </p>
+                  </div>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setSelectedStrategy('move')}
-                style={selectedStrategy === 'move' ? {
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)', // blue-500/10
-                  borderColor: 'rgba(59, 130, 246, 1)',       // blue-500
-                } : {}}
-                className={`group relative z-10 cursor-pointer flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${selectedStrategy === 'move'
-                  ? '' // Handled by style
-                  : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
-                  }`}
-              >
-                <div className={`p-2 rounded-lg transition-colors ${selectedStrategy === 'move'
-                  ? 'bg-blue-500/20'
-                  : 'bg-slate-700 group-hover:bg-slate-600'
-                  }`}>
-                  <Move className={`w-5 h-5 ${selectedStrategy === 'move' ? 'text-blue-400' : 'text-slate-400'
-                    }`} />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="font-semibold text-base text-white mb-1">Move</h3>
-                  <p className="text-xs text-slate-400">
-                    Deletes source (clears space)
-                  </p>
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStrategy('move')}
+                  style={selectedStrategy === 'move' ? {
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)', // blue-500/10
+                    borderColor: 'rgba(59, 130, 246, 1)',       // blue-500
+                  } : {}}
+                  className={`group relative z-10 cursor-pointer flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${selectedStrategy === 'move'
+                    ? '' // Handled by style
+                    : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
+                    }`}
+                >
+                  <div className={`p-2 rounded-lg transition-colors ${selectedStrategy === 'move'
+                    ? 'bg-blue-500/20'
+                    : 'bg-slate-700 group-hover:bg-slate-600'
+                    }`}>
+                    <Move className={`w-5 h-5 ${selectedStrategy === 'move' ? 'text-blue-400' : 'text-slate-400'
+                      }`} />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="font-semibold text-base text-white mb-1">Move</h3>
+                    <p className="text-xs text-slate-400">
+                      Deletes source (clears space)
+                    </p>
+                  </div>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {ingestType !== 'local' && (
+            <div className="glass-card p-8">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">3</span>
+                Processing
+              </h2>
+              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
+                <p className="text-sm text-blue-200">
+                  Google Photos/iCloud archives will be processed and extracted to the destination. Originals in the zip file will be preserved.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Status & Action */}
