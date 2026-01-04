@@ -3,7 +3,8 @@ import { AppLayout } from "./layouts/AppLayout";
 import { Dashboard } from "./pages/Dashboard";
 import { Ingest } from "./pages/Ingest";
 import { Sync } from "./pages/Sync";
-import { Settings } from "./pages/Settings";
+import { Clean } from "./pages/Clean";
+import { Organize } from "./pages/Organize";
 
 
 function App() {
@@ -13,8 +14,10 @@ function App() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="ingest" element={<Ingest />} />
+          <Route path="ingest" element={<Ingest />} />
+          <Route path="clean" element={<Clean />} />
+          <Route path="organize" element={<Organize />} />
           <Route path="sync" element={<Sync />} />
-          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

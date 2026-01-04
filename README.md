@@ -11,6 +11,24 @@ Tasaveer is a media ingestion tool for photographers and videographers. It simpl
 - **Control**: Start and cancel operations safely at any time.
 - **Monitoring**: Real-time progress logs.
 
+
+
+## Workflow
+
+Tasaveer is designed around a 3-step workflow to ensure your media library is pristine before it reaches your permanent storage or Immich server.
+
+1.  **Ingest**
+    Copy over and extract images and videos from various sources like HDD backups, Google Photos Takeout, and SD cards. This step performs basic hash-based deduplication using tools like `phockup`.
+
+2.  **Clean and Dedup**
+    Extract missing metadata (e.g., dates from WhatsApp images) and perform advanced similarity-based deduplication using **Czkawka**. This step allows for stacking similar pictures and deduplicating lower-resolution copies.
+
+3.  **Tag and Categorize**
+    Separate and organize media into logical groups (e.g., Family Shared vs. Personal Phone). The end result is a structured set of folders ready to be added as External Libraries in Immich.
+
+4.  **Sync to Immich**
+    Link the organized folders as External Libraries in Immich and trigger a library scan to update your cloud archive.
+
 ## Installation and Prerequisites
 
 ### Bundled Dependencies

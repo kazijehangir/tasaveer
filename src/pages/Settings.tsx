@@ -211,13 +211,13 @@ export function Settings() {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-4xl pb-20">
+    <div className="space-y-8 animate-fade-in pb-20">
       {/* Header */}
       <div>
-        <h1 className="text-4xl font-bold mb-2">
-          <span className="gradient-text">Settings</span>
-        </h1>
-        <p className="text-slate-400 text-lg">
+        <h2 className="text-3xl font-bold mb-2">
+          Settings
+        </h2>
+        <p className="text-slate-400">
           Configure external tools and connections
         </p>
       </div>

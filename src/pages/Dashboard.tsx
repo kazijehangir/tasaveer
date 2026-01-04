@@ -1,5 +1,6 @@
-import { HardDrive, Calendar, TrendingUp, Import, RefreshCw } from "lucide-react";
+import { Import, RefreshCw, Sparkles, FolderHeart } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Settings } from "./Settings";
 
 export function Dashboard() {
   return (
@@ -17,81 +18,77 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-card-hover p-6 group">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-slate-400 mb-1">Total Media</h3>
-              <p className="text-4xl font-bold group-hover:gradient-text transition-all">
-                0
-              </p>
-              <p className="text-xs text-slate-500 mt-2">Photos & Videos</p>
-            </div>
-            <div className="p-3 rounded-xl bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
-              <HardDrive className="w-6 h-6 text-purple-400" />
-            </div>
-          </div>
-        </div>
 
-        <div className="glass-card-hover p-6 group">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-slate-400 mb-1">Last Sync</h3>
-              <p className="text-2xl font-bold text-yellow-500 group-hover:text-yellow-400 transition-colors">
-                Never
-              </p>
-              <p className="text-xs text-slate-500 mt-2">Sync with Immich</p>
-            </div>
-            <div className="p-3 rounded-xl bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-colors">
-              <Calendar className="w-6 h-6 text-yellow-400" />
-            </div>
-          </div>
-        </div>
 
-        <div className="glass-card-hover p-6 group">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-sm font-medium text-slate-400 mb-1">Storage Used</h3>
-              <p className="text-4xl font-bold group-hover:gradient-text transition-all">
-                0 <span className="text-lg text-slate-500">GB</span>
-              </p>
-              <p className="text-xs text-slate-500 mt-2">Local archive size</p>
-            </div>
-            <div className="p-3 rounded-xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
-              <TrendingUp className="w-6 h-6 text-blue-400" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
+      {/* Workflow Section */}
       <div className="glass-card p-8">
-        <h2 className="text-2xl font-bold mb-6">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h2 className="text-2xl font-bold mb-6">Workflow</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Step 1: Ingest */}
           <Link
             to="/ingest"
-            className="group flex items-center gap-4 p-6 rounded-xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all hover:scale-[1.02]"
+            className="group flex flex-col gap-4 p-6 rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20 hover:border-purple-500/40 transition-all hover:scale-[1.02]"
           >
-            <div className="p-3 rounded-lg bg-purple-500/20 group-hover:bg-purple-500/30 transition-colors">
-              <Import className="w-6 h-6 text-purple-400" />
+            <div className="flex items-center justify-between">
+              <div className="p-3 rounded-lg bg-purple-500/20 group-hover:bg-purple-500/30 transition-colors">
+                <Import className="w-6 h-6 text-purple-400" />
+              </div>
+              <span className="text-xs font-mono text-purple-400/60 uppercase tracking-wider">Step 1</span>
             </div>
             <div>
-              <h3 className="font-semibold text-lg text-white">Import Media</h3>
-              <p className="text-sm text-slate-400">Add photos and videos to your archive</p>
+              <h3 className="font-semibold text-lg text-white mb-1">Ingest</h3>
+              <p className="text-sm text-slate-400">Import media from external devices</p>
             </div>
           </Link>
 
+          {/* Step 2: Clean & Dedup */}
           <Link
-            to="/sync"
-            className="group flex items-center gap-4 p-6 rounded-xl bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 hover:border-blue-500/40 transition-all hover:scale-[1.02]"
+            to="/clean"
+            className="group flex flex-col gap-4 p-6 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 hover:border-blue-500/40 transition-all hover:scale-[1.02]"
           >
-            <div className="p-3 rounded-lg bg-blue-500/20 group-hover:bg-blue-500/30 transition-colors">
-              <RefreshCw className="w-6 h-6 text-blue-400" />
+            <div className="flex items-center justify-between">
+              <div className="p-3 rounded-lg bg-blue-500/20 group-hover:bg-blue-500/30 transition-colors">
+                <Sparkles className="w-6 h-6 text-blue-400" />
+              </div>
+              <span className="text-xs font-mono text-blue-400/60 uppercase tracking-wider">Step 2</span>
             </div>
             <div>
-              <h3 className="font-semibold text-lg text-white">Sync to Immich</h3>
-              <p className="text-sm text-slate-400">Upload your archive to Immich server</p>
+              <h3 className="font-semibold text-lg text-white mb-1">Clean & Dedup</h3>
+              <p className="text-sm text-slate-400">Fix metadata and remove duplicates</p>
+            </div>
+          </Link>
+
+          {/* Step 3: Tag & Categorize */}
+          <Link
+            to="/organize"
+            className="group flex flex-col gap-4 p-6 rounded-xl bg-gradient-to-br from-cyan-500/10 to-pink-500/10 border border-cyan-500/20 hover:border-cyan-500/40 transition-all hover:scale-[1.02]"
+          >
+            <div className="flex items-center justify-between">
+              <div className="p-3 rounded-lg bg-pink-500/20 group-hover:bg-pink-500/30 transition-colors">
+                <FolderHeart className="w-6 h-6 text-pink-400" />
+              </div>
+              <span className="text-xs font-mono text-pink-400/60 uppercase tracking-wider">Step 3</span>
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg text-white mb-1">Tag & Categorize</h3>
+              <p className="text-sm text-slate-400">Organize into family & personal</p>
+            </div>
+          </Link>
+
+          {/* Step 4: Sync */}
+          <Link
+            to="/sync"
+            className="group flex flex-col gap-4 p-6 rounded-xl bg-gradient-to-br from-pink-500/10 to-purple-500/10 border border-pink-500/20 hover:border-pink-500/40 transition-all hover:scale-[1.02]"
+          >
+            <div className="flex items-center justify-between">
+              <div className="p-3 rounded-lg bg-green-500/20 group-hover:bg-green-500/30 transition-colors">
+                <RefreshCw className="w-6 h-6 text-green-400" />
+              </div>
+              <span className="text-xs font-mono text-green-400/60 uppercase tracking-wider">Step 4</span>
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg text-white mb-1">Sync</h3>
+              <p className="text-sm text-slate-400">Upload organized library to Immich</p>
             </div>
           </Link>
         </div>
@@ -107,6 +104,12 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Settings Section */}
+      <div className="pt-8 border-t border-slate-800">
+        <Settings />
+      </div>
     </div>
   );
 }
+

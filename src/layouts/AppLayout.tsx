@@ -1,31 +1,36 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Import, RefreshCw, Settings } from "lucide-react";
+import { LayoutDashboard, Import, RefreshCw, Sparkles, FolderHeart } from "lucide-react";
 import { clsx } from "clsx";
 
 const NAV_ITEMS = [
   {
     path: "/",
-    label: "Dashboard", 
+    label: "Home",
     icon: LayoutDashboard,
-    description: "Overview and stats"
   },
   {
     path: "/ingest",
-    label: "Ingest", 
+    label: "Ingest",
     icon: Import,
-    description: "Import media files"
+    step: 1
+  },
+  {
+    path: "/clean",
+    label: "Clean",
+    icon: Sparkles,
+    step: 2
+  },
+  {
+    path: "/organize",
+    label: "Organize",
+    icon: FolderHeart,
+    step: 3
   },
   {
     path: "/sync",
-    label: "Sync", 
+    label: "Sync",
     icon: RefreshCw,
-    description: "Sync to Immich"
-  },
-  {
-    path: "/settings",
-    label: "Settings", 
-    icon: Settings,
-    description: "Configure app"
+    step: 4
   },
 ];
 
@@ -53,7 +58,7 @@ export function AppLayout() {
             </div>
 
             {/* Navigation */}
-            <nav className="flex flex-row items-center gap-3">
+            <nav className="flex flex-row items-center gap-2">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -62,42 +67,36 @@ export function AppLayout() {
                     key={item.path}
                     to={item.path}
                     className={clsx(
-                      "group relative px-6 py-3 rounded-xl transition-all duration-300",
+                      "group relative px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-3",
                       isActive
-                        ? "glass-card bg-gradient-to-r from-purple-600/20 to-blue-600/20 border-purple-500/50 shadow-lg shadow-purple-500/20"
-                        : "glass-card hover:bg-slate-800/50 border-slate-700/50"
+                        ? "bg-slate-700/50 text-white shadow-sm ring-1 ring-white/10"
+                        : "hover:bg-slate-800/50 text-slate-300 hover:text-white"
                     )}
                   >
-                    <div className="flex items-center gap-3">
+                    {/* Badge for Step Number */}
+                    {item.step && (
                       <div className={clsx(
-                        "p-2 rounded-lg transition-all duration-300",
+                        "flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold font-mono transition-colors",
                         isActive
-                          ? "bg-gradient-to-br from-purple-500 to-blue-500 shadow-md"
-                          : "bg-slate-700/50 group-hover:bg-slate-600/50"
+                          ? "bg-blue-500/20 text-blue-300"
+                          : "bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-300"
                       )}>
-                        <Icon className={clsx(
-                          "w-4 h-4 transition-colors",
-                          isActive ? "text-white" : "text-slate-400 group-hover:text-white"
-                        )} />
+                        {item.step}
                       </div>
-                      <div>
-                        <h3 className={clsx(
-                          "font-semibold text-sm transition-colors leading-none",
-                          isActive ? "text-white" : "text-slate-300 group-hover:text-white"
-                        )}>
-                          {item.label}
-                        </h3>
-                        <p className={clsx(
-                          "text-xs transition-colors mt-0.5",
-                          isActive ? "text-purple-300" : "text-slate-500 group-hover:text-slate-400"
-                        )}>
-                          {item.description}
-                        </p>
-                      </div>
-                      {isActive && (
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse-glow" />
-                      )}
-                    </div>
+                    )}
+
+                    <Icon className={clsx(
+                      "w-4 h-4 transition-colors",
+                      isActive ? "text-purple-400" : "text-slate-500 group-hover:text-purple-400/70"
+                    )} />
+
+                    <span className="font-medium text-sm">
+                      {item.label}
+                    </span>
+
+                    {isActive && (
+                      <div className="absolute inset-x-0 -bottom-[17px] h-0.5 bg-gradient-to-r from-purple-500 to-blue-500" />
+                    )}
                   </Link>
                 );
               })}
