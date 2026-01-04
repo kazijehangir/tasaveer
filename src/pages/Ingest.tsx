@@ -18,6 +18,37 @@ export function Ingest() {
   const runningCommandsRef = useRef<Array<{ kill: () => Promise<void> }>>([]);
   const cancelledRef = useRef(false);
 
+  // Log buffering
+  const logBufferRef = useRef<string[]>([]);
+  const flushIntervalRef = useRef<number | null>(null);
+
+  // Flush logs periodically to avoid React render thrashing
+  useEffect(() => {
+    if (status === 'running') {
+      flushIntervalRef.current = window.setInterval(() => {
+        if (logBufferRef.current.length > 0) {
+          const newLogs = [...logBufferRef.current];
+          logBufferRef.current = [];
+          setLogs(prev => [...prev, ...newLogs]);
+        }
+      }, 100);
+    } else {
+      // Flush remaining
+      if (logBufferRef.current.length > 0) {
+        setLogs(prev => [...prev, ...logBufferRef.current]);
+        logBufferRef.current = [];
+      }
+      if (flushIntervalRef.current) {
+        clearInterval(flushIntervalRef.current);
+        flushIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);
+    };
+  }, [status]);
+
   useEffect(() => {
     async function loadDefaults() {
       try {
@@ -39,10 +70,9 @@ export function Ingest() {
   const handleSelectSource = async () => {
     try {
       const selected = await open({
-        directory: true, // Always select directories now
+        directory: true,
         multiple: false,
         title: "Select Source Folder",
-        // No filters needed for directories
       });
       if (selected) {
         setSourcePath(selected as string);
@@ -68,23 +98,23 @@ export function Ingest() {
   };
 
   const handleCancel = async () => {
-    setLogs(prev => [...prev, 'Canceling operations...']);
+    logBufferRef.current.push('Canceling operations...');
+    setLogs(prev => [...prev, 'Canceling operations...']); // Immediate feedback
     cancelledRef.current = true;
 
-    // Kill all running commands
     for (const cmd of runningCommandsRef.current) {
       try {
         await cmd.kill();
-        setLogs(prev => [...prev, 'Killed running process.']);
+        logBufferRef.current.push('Killed running process.');
       } catch (err) {
         console.error('Failed to kill command:', err);
-        setLogs(prev => [...prev, `Failed to kill process: ${err}`]);
+        logBufferRef.current.push(`Failed to kill process: ${err}`);
       }
     }
 
     runningCommandsRef.current = [];
-    setLogs(prev => [...prev, 'Operation canceled by user.']);
-    setStatus('idle'); // Reset to idle so user can start again
+    logBufferRef.current.push('Operation canceled by user.');
+    setStatus('idle');
   };
 
   const handleIngest = async () => {
@@ -92,6 +122,7 @@ export function Ingest() {
 
     setStatus('running');
     setLogs([]);
+    logBufferRef.current = [];
     setIsLogsExpanded(true);
     runningCommandsRef.current = [];
     cancelledRef.current = false;
@@ -99,57 +130,52 @@ export function Ingest() {
     try {
       // Local (Phockup) Workflow
       if (ingestType === 'local') {
-        // On Windows, try phockup.bat first since GUI apps may not inherit user PATH
         const phockupCmd = navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup';
 
-        const runPhockup = (type: 'image' | 'video') => {
+        const runPhockup = () => {
           return new Promise<void>(async (resolve, reject) => {
-            const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '--file-type', type];
+            const threads = navigator.hardwareConcurrency || 4;
+            // Optimized: Single pass without --file-type
+            const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '-c', threads.toString()];
 
             if (selectedStrategy === 'move') {
               args.push('--move');
             }
 
-            setLogs(prev => [...prev, `Starting local ingest for ${type}s...`]);
+            logBufferRef.current.push(`Starting local ingest with ${threads} threads...`);
 
             const command = Command.create(phockupCmd, args);
             await spawnAndTrack(command, resolve, reject);
           });
         };
 
-
-        await runPhockup('image');
-        if (!cancelledRef.current) await runPhockup('video');
+        // Single pass
+        await runPhockup();
       }
       // Immich-Go Workflows
       else {
         const typeArg = ingestType === 'google-photos' ? 'from-google-photos' : 'from-icloud';
-
         let targetFiles: string[] = [];
 
         try {
-          // Find zips in the source folder
-          setLogs(prev => [...prev, `Scanning ${sourcePath} for zip files...`]);
+          logBufferRef.current.push(`Scanning ${sourcePath} for zip files...`);
           const foundZips = await invoke<string[]>('find_zips', { path: sourcePath });
           if (foundZips && foundZips.length > 0) {
             targetFiles = foundZips;
-            setLogs(prev => [...prev, `Found ${foundZips.length} zip files.`]);
+            logBufferRef.current.push(`Found ${foundZips.length} zip files.`);
           } else {
-            setLogs(prev => [...prev, `No zip files found in ${sourcePath}. Passing folder path directly.`]);
+            logBufferRef.current.push(`No zip files found in ${sourcePath}. Passing folder path directly.`);
             targetFiles = [sourcePath];
           }
         } catch (e) {
           console.error("Failed to scan for zips:", e);
-          setLogs(prev => [...prev, `Failed to scan for zips: ${e}. Using folder path.`]);
+          logBufferRef.current.push(`Failed to scan for zips: ${e}. Using folder path.`);
           targetFiles = [sourcePath];
         }
 
-        setLogs(prev => [...prev, `Starting ${ingestType} import using immich-go...`]);
+        logBufferRef.current.push(`Starting ${ingestType} import using immich-go...`);
 
-        // On Windows, try immich-go.exe since GUI apps may not inherit user PATH
         const immichGoCmd = navigator.platform.toLowerCase().includes('win') ? 'immich-go.exe' : 'immich-go';
-
-        // Pass all target files as arguments
         const args = ['archive', typeArg, '--write-to-folder', destPath, ...targetFiles];
         const command = Command.create(immichGoCmd, args);
 
@@ -160,18 +186,17 @@ export function Ingest() {
 
       if (!cancelledRef.current) {
         setStatus('success');
-        setLogs(prev => [...prev, `All operations completed!`]);
+        logBufferRef.current.push(`All operations completed!`);
       }
 
     } catch (err) {
       if (!cancelledRef.current) {
         setStatus('error');
-        setLogs(prev => [...prev, `Failed to execute ingest: ${err}`]);
+        logBufferRef.current.push(`Failed to execute ingest: ${err}`);
       }
     }
   };
 
-  // Helper to spawn command and track it
   const spawnAndTrack = (command: Command<string>, resolve: (val?: void) => void, reject: (err: any) => void) => {
     return new Promise<void>(async (internalResolve) => {
       let child: any = null;
@@ -184,11 +209,11 @@ export function Ingest() {
         if (data.code === 0) {
           resolve();
         } else if (data.code === null) {
-          setLogs(prev => [...prev, `Process terminated.`]);
+          logBufferRef.current.push(`Process terminated.`);
           resolve();
         } else {
-          setLogs(prev => [...prev, `Process exited with code ${data.code}`]);
-          resolve(); // Don't fail the whole chain on one non-zero exit? Or maybe we should.
+          logBufferRef.current.push(`Process exited with code ${data.code}`);
+          resolve();
         }
         internalResolve();
       });
@@ -196,13 +221,13 @@ export function Ingest() {
       command.on('error', (error: any) => {
         if (cancelled) return;
         if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
-        setLogs(prev => [...prev, `Process error: ${error}`]);
+        logBufferRef.current.push(`Process error: ${error}`);
         reject(error);
         internalResolve();
       });
 
-      command.stdout.on('data', (line: string) => !cancelled && setLogs(prev => [...prev, line]));
-      command.stderr.on('data', (line: string) => !cancelled && setLogs(prev => [...prev, line]));
+      command.stdout.on('data', (line: string) => !cancelled && logBufferRef.current.push(line));
+      command.stderr.on('data', (line: string) => !cancelled && logBufferRef.current.push(line));
 
       try {
         child = await command.spawn();
@@ -215,7 +240,7 @@ export function Ingest() {
         }
         runningCommandsRef.current.push(child);
       } catch (err) {
-        setLogs(prev => [...prev, `Failed to spawn process: ${err}`]);
+        logBufferRef.current.push(`Failed to spawn process: ${err}`);
         reject(err);
         internalResolve();
       }
