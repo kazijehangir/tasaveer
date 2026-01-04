@@ -99,6 +99,9 @@ export function Ingest() {
     try {
       // Local (Phockup) Workflow
       if (ingestType === 'local') {
+        // On Windows, try phockup.bat first since GUI apps may not inherit user PATH
+        const phockupCmd = navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup';
+
         const runPhockup = (type: 'image' | 'video') => {
           return new Promise<void>(async (resolve, reject) => {
             const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '--file-type', type];
@@ -109,10 +112,11 @@ export function Ingest() {
 
             setLogs(prev => [...prev, `Starting local ingest for ${type}s...`]);
 
-            const command = Command.create('phockup', args);
+            const command = Command.create(phockupCmd, args);
             await spawnAndTrack(command, resolve, reject);
           });
         };
+
 
         await runPhockup('image');
         if (!cancelledRef.current) await runPhockup('video');
@@ -142,9 +146,12 @@ export function Ingest() {
 
         setLogs(prev => [...prev, `Starting ${ingestType} import using immich-go...`]);
 
+        // On Windows, try immich-go.exe since GUI apps may not inherit user PATH
+        const immichGoCmd = navigator.platform.toLowerCase().includes('win') ? 'immich-go.exe' : 'immich-go';
+
         // Pass all target files as arguments
         const args = ['archive', typeArg, '--write-to-folder', destPath, ...targetFiles];
-        const command = Command.create('immich-go', args);
+        const command = Command.create(immichGoCmd, args);
 
         await new Promise<void>(async (resolve, reject) => {
           await spawnAndTrack(command, resolve, reject);
@@ -175,22 +182,22 @@ export function Ingest() {
         if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
 
         if (data.code === 0) {
-              resolve();
-            } else if (data.code === null) {
+          resolve();
+        } else if (data.code === null) {
           setLogs(prev => [...prev, `Process terminated.`]);
-              resolve();
-            } else {
+          resolve();
+        } else {
           setLogs(prev => [...prev, `Process exited with code ${data.code}`]);
           resolve(); // Don't fail the whole chain on one non-zero exit? Or maybe we should.
-            }
+        }
         internalResolve();
       });
 
       command.on('error', (error: any) => {
-            if (cancelled) return;
+        if (cancelled) return;
         if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
         setLogs(prev => [...prev, `Process error: ${error}`]);
-            reject(error);
+        reject(error);
         internalResolve();
       });
 
@@ -199,17 +206,17 @@ export function Ingest() {
 
       try {
         child = await command.spawn();
-            if (cancelledRef.current) {
-              cancelled = true;
-              await child.kill();
-              reject(new Error('Cancelled'));
-              internalResolve();
-              return;
-            }
-            runningCommandsRef.current.push(child);
+        if (cancelledRef.current) {
+          cancelled = true;
+          await child.kill();
+          reject(new Error('Cancelled'));
+          internalResolve();
+          return;
+        }
+        runningCommandsRef.current.push(child);
       } catch (err) {
         setLogs(prev => [...prev, `Failed to spawn process: ${err}`]);
-            reject(err);
+        reject(err);
         internalResolve();
       }
     });
@@ -287,10 +294,10 @@ export function Ingest() {
                     <p className="text-sm font-medium truncate" title={sourcePath}>{sourcePath}</p>
                   </div>
                 </div>
-                  <button onClick={() => setSourcePath(null)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
-                    Change
-                  </button>
-                </div>
+                <button onClick={() => setSourcePath(null)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
+                  Change
+                </button>
+              </div>
             )}
           </div>
 
@@ -318,19 +325,19 @@ export function Ingest() {
                     <FolderOpen className="w-5 h-5" />
                   </div>
                   <div className="truncate">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Destination</p>
-                        {destPath === defaultArchivePath && (
-                          <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">Default</span>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Destination</p>
+                      {destPath === defaultArchivePath && (
+                        <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">Default</span>
+                      )}
+                    </div>
                     <p className="text-sm font-medium truncate" title={destPath}>{destPath}</p>
                   </div>
                 </div>
                 <button onClick={() => setDestPath(null)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
                   Change
-                  </button>
-                </div>
+                </button>
+              </div>
             )}
           </div>
 
@@ -437,21 +444,21 @@ export function Ingest() {
                   <p>Ready to ingest</p>
                 </div>
               ) : (
-                  isLogsExpanded ? (
-                    logs.map((log, i) => (
-                      <div key={i} className="mb-1 text-slate-300 break-all border-b border-transparent hover:border-slate-800/50">{log}</div>
-                    ))
-                  ) : (
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="text-slate-300 truncate font-medium">
-                        <span className="text-slate-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
-                        {logs[logs.length - 1]}
-                      </div>
-                      <div className="flex gap-1">
-                        <span className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse" />
-                      </div>
+                isLogsExpanded ? (
+                  logs.map((log, i) => (
+                    <div key={i} className="mb-1 text-slate-300 break-all border-b border-transparent hover:border-slate-800/50">{log}</div>
+                  ))
+                ) : (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="text-slate-300 truncate font-medium">
+                      <span className="text-slate-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
+                      {logs[logs.length - 1]}
                     </div>
-                  )
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse" />
+                    </div>
+                  </div>
+                )
               )}
             </div>
 

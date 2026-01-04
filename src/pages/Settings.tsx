@@ -57,24 +57,30 @@ export function Settings() {
     let phockupFound = false;
     let immichGoFound = false;
 
-    // Check Phockup
-    try {
-      const phockupCmd = Command.create('phockup', ['--help']);
-      const output = await phockupCmd.execute();
-      if (output.code === 0) phockupFound = true;
-    } catch (e) {
-      console.log("Phockup check failed:", e);
+    // Check Phockup - try multiple command variants for Windows compatibility
+    // On Windows, GUI apps may not inherit user PATH changes until reboot
+    for (const cmdName of ['phockup', 'phockup.bat'] as const) {
+      if (phockupFound) break;
+      try {
+        const phockupCmd = Command.create(cmdName, ['--help']);
+        const output = await phockupCmd.execute();
+        if (output.code === 0) phockupFound = true;
+      } catch (e) {
+        console.log(`Phockup check failed for ${cmdName}:`, e);
+      }
     }
 
-    // Check Immich-Go
-    try {
-      // User reported 'immich-go -v' works.
-      const immichGoCmd = Command.create('immich-go', ['-v']);
-      const output = await immichGoCmd.execute();
-      console.log("Immich-go check result:", output);
-      if (output.code === 0) immichGoFound = true;
-    } catch (e) {
-      console.log("Immich-go check failed:", e);
+    // Check Immich-Go - try multiple command variants for Windows compatibility
+    for (const cmdName of ['immich-go', 'immich-go.exe'] as const) {
+      if (immichGoFound) break;
+      try {
+        const immichGoCmd = Command.create(cmdName, ['version']);
+        const output = await immichGoCmd.execute();
+        console.log(`Immich-go check result for ${cmdName}:`, output);
+        if (output.code === 0) immichGoFound = true;
+      } catch (e) {
+        console.log(`Immich-go check failed for ${cmdName}:`, e);
+      }
     }
 
     setValidation({
@@ -275,7 +281,7 @@ export function Settings() {
             </p>
             <div className="flex gap-3">
               <input
-                type="text" 
+                type="text"
                 className="input-field flex-1"
                 placeholder="/Users/username/Pictures/Archive"
                 value={settings.archivePath}
@@ -307,7 +313,7 @@ export function Settings() {
               Server URL
             </label>
             <input
-              type="text" 
+              type="text"
               className="input-field w-full"
               placeholder="http://192.168.1.100:2283"
               value={settings.immichUrl}
@@ -321,7 +327,7 @@ export function Settings() {
             </label>
             <div className="relative">
               <input
-                type="password" 
+                type="password"
                 className="input-field w-full pr-12"
                 placeholder="Enter your Immich API key"
                 value={settings.immichApiKey}

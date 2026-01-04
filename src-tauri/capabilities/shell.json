@@ -1,7 +1,7 @@
 {
     "$schema": "../gen/schemas/desktop-schema.json",
     "identifier": "shell-allow-phockup",
-    "description": "Allow execution of phockup command",
+    "description": "Allow execution of phockup and immich-go commands",
     "windows": [
         "main"
     ],
@@ -15,8 +15,18 @@
                     "args": true
                 },
                 {
+                    "name": "phockup.bat",
+                    "cmd": "phockup.bat",
+                    "args": true
+                },
+                {
                     "name": "immich-go",
                     "cmd": "immich-go",
+                    "args": true
+                },
+                {
+                    "name": "immich-go.exe",
+                    "cmd": "immich-go.exe",
                     "args": true
                 }
             ]
@@ -30,8 +40,18 @@
                     "args": true
                 },
                 {
+                    "name": "phockup.bat",
+                    "cmd": "phockup.bat",
+                    "args": true
+                },
+                {
                     "name": "immich-go",
                     "cmd": "immich-go",
+                    "args": true
+                },
+                {
+                    "name": "immich-go.exe",
+                    "cmd": "immich-go.exe",
                     "args": true
                 }
             ]
