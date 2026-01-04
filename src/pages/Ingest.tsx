@@ -1,4 +1,4 @@
-import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2 } from "lucide-react";
+import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Command } from "@tauri-apps/plugin-shell";
@@ -9,6 +9,7 @@ export function Ingest() {
   const [destPath, setDestPath] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
+  const [isLogsExpanded, setIsLogsExpanded] = useState(false);
 
   const handleSelectSource = async () => {
     try {
@@ -45,43 +46,62 @@ export function Ingest() {
 
     setStatus('running');
     setLogs([]);
+    setIsLogsExpanded(true); // Auto-expand logs to show progress of multiple steps
 
     try {
-      const args = [sourcePath, destPath];
-      if (selectedStrategy === 'move') {
-        args.push('--move');
-      }
+      // Helper to spawn phockup with specific file type
+      const runPhockup = (type: 'image' | 'video') => {
+        return new Promise<void>(async (resolve, reject) => {
+          const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--progress', '--file-type', type];
 
-      const command = Command.create('phockup', args);
+          if (selectedStrategy === 'move') {
+            args.push('--move');
+          }
 
-      command.on('close', (data) => {
-        if (data.code === 0) {
-          setStatus('success');
-          setLogs(prev => [...prev, `Process finished successfully!`]);
-        } else {
-          setStatus('error');
-          setLogs(prev => [...prev, `Process exited with code ${data.code}`]);
-        }
-      });
+          setLogs(prev => [...prev, `Starting ingest for ${type}s...`]);
 
-      command.on('error', (error) => {
-        setStatus('error');
-        setLogs(prev => [...prev, `Error: ${error}`]);
-      });
+          const command = Command.create('phockup', args);
 
-      command.stdout.on('data', (line) => {
-        setLogs(prev => [...prev, line]);
-      });
+          command.on('close', (data) => {
+            if (data.code === 0) {
+              setLogs(prev => [...prev, `Finished ${type}s successfully.`]);
+              resolve();
+            } else {
+              setLogs(prev => [...prev, `Process for ${type}s exited with code ${data.code}`]);
+              // We don't necessarily want to reject here if one fails, maybe? 
+              // But for now let's assume strict success needed.
+              // Actually, if no images found it might exit 0? 
+              resolve();
+            }
+          });
 
-      command.stderr.on('data', (line) => {
-        setLogs(prev => [...prev, line]);
-      });
+          command.on('error', (error) => {
+            setLogs(prev => [...prev, `Error processing ${type}s: ${error}`]);
+            reject(error);
+          });
 
-      await command.spawn();
+          command.stdout.on('data', (line) => {
+            setLogs(prev => [...prev, line]);
+          });
+
+          command.stderr.on('data', (line) => {
+            setLogs(prev => [...prev, line]);
+          });
+
+          await command.spawn();
+        });
+      };
+
+      // Run sequentially
+      await runPhockup('image');
+      await runPhockup('video');
+
+      setStatus('success');
+      setLogs(prev => [...prev, `All operations completed!`]);
 
     } catch (err) {
       setStatus('error');
-      setLogs(prev => [...prev, `Failed to start process: ${err}`]);
+      setLogs(prev => [...prev, `Failed to execute ingest: ${err}`]);
     }
   };
 
@@ -238,17 +258,41 @@ export function Ingest() {
         {/* Status & Action */}
         <div className="space-y-8">
           <div className="glass-card p-8 h-full flex flex-col">
-            <h2 className="text-xl font-bold mb-6">Status</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold">Status</h2>
+              <button
+                onClick={() => setIsLogsExpanded(!isLogsExpanded)}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors flex items-center gap-2 text-xs uppercase font-bold tracking-wider"
+              >
+                {isLogsExpanded ? (
+                  <>Hide Logs <ChevronUp className="w-4 h-4" /></>
+                ) : (
+                  <>Show All <ChevronDown className="w-4 h-4" /></>
+                )}
+              </button>
+            </div>
 
-            <div className="flex-1 bg-slate-950/50 rounded-xl p-4 font-mono text-xs overflow-y-auto max-h-[400px] border border-slate-800/50">
+            <div className={`bg-slate-950/50 rounded-xl font-mono text-xs border border-slate-800/50 overflow-hidden transition-all duration-300 ${isLogsExpanded ? 'flex-1 p-4 overflow-y-auto max-h-[400px]' : 'p-4'}`}>
               {logs.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-600">
+                <div className={`flex flex-col items-center justify-center text-slate-600 ${isLogsExpanded ? 'h-full' : ''}`}>
                   <p>Ready to ingest</p>
                 </div>
               ) : (
-                logs.map((log, i) => (
-                  <div key={i} className="mb-1 text-slate-300 break-all">{log}</div>
-                ))
+                  isLogsExpanded ? (
+                    logs.map((log, i) => (
+                      <div key={i} className="mb-1 text-slate-300 break-all border-b border-transparent hover:border-slate-800/50">{log}</div>
+                    ))
+                  ) : (
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-slate-300 truncate font-medium">
+                        <span className="text-slate-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
+                        {logs[logs.length - 1]}
+                      </div>
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse" />
+                      </div>
+                    </div>
+                  )
               )}
             </div>
 
