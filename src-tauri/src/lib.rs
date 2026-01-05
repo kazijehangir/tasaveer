@@ -1,6 +1,9 @@
 use std::fs;
 use std::io::Write;
 
+mod metadata;
+mod dedup;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -122,7 +125,18 @@ pub fn run() {
             load_settings,
             save_settings,
             find_zips,
-            validate_immich
+            validate_immich,
+            // Metadata commands
+            metadata::read_exif_metadata,
+            metadata::get_camera_model,
+            metadata::write_exif_date_if_missing,
+            metadata::write_exif_keywords,
+            metadata::scan_missing_dates,
+            // Dedup commands
+            dedup::check_czkawka,
+            dedup::find_duplicates,
+            dedup::find_similar_images,
+            dedup::delete_to_trash,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
