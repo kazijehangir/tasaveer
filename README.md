@@ -126,3 +126,16 @@ This template should help get you started developing with Tauri, React and Types
     *   Or use Winget: `winget install Rustlang.Rustup`.
 2.  **C++ Build Tools**:
     *   Ensure "Desktop development with C++" is installed via Visual Studio Build Tools.
+
+### Running Tests
+
+Run all frontend tests:
+```bash
+npm test              # Watch mode
+npm run test:coverage # With coverage report
+```
+
+Run Rust backend tests:
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+```
