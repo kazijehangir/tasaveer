@@ -44,6 +44,9 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
+      - name: Download Sidecar Binaries
+        run: npm run download-deps
+
       - name: Run backend tests
         run: |
           cd src-tauri
