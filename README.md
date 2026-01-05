@@ -1,6 +1,6 @@
 # Tasaveer
 
-<img align="right" width="100" height="100" src="public/app-icon.png">
+<img align="left" width="100" height="100" hspace="20" src="public/app-icon.png">
 
 
 Tasaveer is a media ingestion tool for photographers and videographers. It simplifies the process of importing media from various sources (like SD cards) into an organized archive on your local machine.
