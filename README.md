@@ -2,11 +2,10 @@
 
 <img align="left" width="80" height="80" hspace="20" src="public/app-icon.png">
 
+Tasaveer (/təsˌviːr/, Urdu: تصاویر, lit. 'photographs') is a media management tool which simplifies the process of importing media from various sources (like SD cards, Google Photos Takeout, and iCloud Takeout) into an organized local archive.
+
 [![Test](https://github.com/kazijehangir/tasaveer/actions/workflows/test.yml/badge.svg)](https://github.com/kazijehangir/tasaveer/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/kazijehangir/tasaveer/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/kazijehangir/tasaveer)
-
-
-Tasaveer is a media ingestion tool for photographers and videographers. It simplifies the process of importing media from various sources (like SD cards) into an organized archive on your local machine.
 
 
 ## Features
