@@ -2,6 +2,8 @@
 
 Tasaveer is a media ingestion tool for photographers and videographers. It simplifies the process of importing media from various sources (like SD cards) into an organized archive on your local machine.
 
+![Tasaveer Home Dashboard](public/home-screenshot.png)
+
 ## Features
 
 - **Ingest Workflow**: Streamlined process to select source and destination paths.
@@ -19,6 +21,8 @@ Tasaveer is designed around a 3-step workflow to ensure your media library is pr
 
 1.  **Ingest**
     Copy over and extract images and videos from various sources like HDD backups, Google Photos Takeout, and SD cards. This step performs basic hash-based deduplication using tools like `phockup`.
+
+    ![Ingest Workflow](public/ingest-screenshot.png)
 
 2.  **Clean and Dedup**
     Extract missing metadata (e.g., dates from WhatsApp images) and perform advanced similarity-based deduplication using **Czkawka**. This step allows for stacking similar pictures and deduplicating lower-resolution copies.
@@ -92,6 +96,8 @@ pipx install git+https://github.com/ivandokov/phockup.git
 You can override the bundled or PATH binaries with your own custom installations in **Settings → Advanced: Custom Binary Paths**. This is useful if you want to:
 - Use a specific version of immich-go
 - Point to phockup installed in a non-standard location
+
+![Settings Page](public/settings-screenshot.png)
 
 ### External Dependencies Reference
 
