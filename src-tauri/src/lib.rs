@@ -81,8 +81,28 @@ fn validate_immich(url: String, api_key: String) -> Result<String, String> {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn fix_path_env() {
+    use std::process::Command;
+    use std::env;
+
+    if let Ok(output) = Command::new("sh")
+        .arg("-l")
+        .arg("-c")
+        .arg("echo $PATH")
+        .output()
+    {
+        if let Ok(path) = String::from_utf8(output.stdout) {
+            env::set_var("PATH", path.trim());
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "macos")]
+    fix_path_env();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
