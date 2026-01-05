@@ -48,9 +48,7 @@ export function AppLayout() {
           <div className="flex flex-row items-center justify-between">
             {/* Branding */}
             <div className="flex flex-row items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg">
-                <span className="text-xl font-bold">T</span>
-              </div>
+              <img src="/app-icon.png" alt="Tasaveer Logo" className="w-10 h-10 rounded-xl shadow-lg" />
               <div>
                 <h1 className="text-2xl font-bold gradient-text leading-none">Tasaveer</h1>
                 <p className="text-xs text-slate-500">Media Archive Manager</p>
