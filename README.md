@@ -5,8 +5,6 @@
 
 Tasaveer is a media ingestion tool for photographers and videographers. It simplifies the process of importing media from various sources (like SD cards) into an organized archive on your local machine.
 
-![Tasaveer Home Dashboard](public/home-screenshot.png)
-
 ## Features
 
 - **Ingest Workflow**: Streamlined process to select source and destination paths.
@@ -20,7 +18,9 @@ Tasaveer is a media ingestion tool for photographers and videographers. It simpl
 
 ## Workflow
 
-Tasaveer is designed around a 3-step workflow to ensure your media library is pristine before it reaches your permanent storage or Immich server.
+Tasaveer is designed around a 4-step workflow to ensure your media library is pristine before it reaches your permanent storage or Immich server.
+
+![Tasaveer Home Dashboard](public/home-screenshot.png)
 
 1.  **Ingest**
     Copy over and extract images and videos from various sources like HDD backups, Google Photos Takeout, and SD cards. This step performs basic hash-based deduplication using tools like `phockup`.
