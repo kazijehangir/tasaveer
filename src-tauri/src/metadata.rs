@@ -276,6 +276,7 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
     let output = Command::new("exiftool")
         .args([
             "-overwrite_original",
+            "-P", // Preserve file modification date
             &format!("-XPKeywords={}", keywords_str),
             &format!("-Keywords={}", keywords_str),
             &format!("-IPTC:Keywords={}", keywords_str),

@@ -63,6 +63,66 @@ fn find_zips(path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+fn copy_to_staging(source: String, staging: String) -> Result<String, String> {
+    // Check if source exists
+    if !std::path::Path::new(&source).exists() {
+        return Err(format!("Source path does not exist: {}", source));
+    }
+
+    // Create staging directory if it doesn't exist
+    fs::create_dir_all(&staging).map_err(|e| format!("Failed to create staging dir: {}", e))?;
+
+    // Use rsync -a (archive mode) to preserve attributes and recursiveness
+    // source/ -> copies contents of source to staging (if trailing slash)
+    // source  -> copies source directory into staging (if no trailing slash)
+    // We want to copy contents into a subdirectory in staging or directly? 
+    // Let's copy source folder INTO staging to keep them separated if multiple sources.
+    
+    // Get source folder name to create specific subdir in staging
+    let source_path = std::path::Path::new(&source);
+    let dir_name = source_path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("source");
+        
+    let final_dest = std::path::Path::new(&staging).join(dir_name);
+    let final_dest_str = final_dest.to_string_lossy().to_string();
+    
+    // Ensure parent dir exists
+    if let Some(parent) = final_dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let output = std::process::Command::new("rsync")
+        .args([
+            "-a",          // archive mode (recursive, preserve attrs)
+            &source,       // source
+            &staging       // destination (rsync will create dir_name inside staging)
+        ])
+        .output()
+        .map_err(|e| format!("Failed to execute rsync: {}", e))?;
+
+    if output.status.success() {
+        Ok(final_dest_str)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("rsync failed: {}", stderr))
+    }
+}
+
+#[tauri::command]
+fn clean_staging(path: String) -> Result<(), String> {
+    // Safety check: ensure path contains "staging" to prevent accidental deletion of important dirs
+    if !path.to_lowercase().contains("staging") {
+        return Err("Safety check failed: Path must contain 'staging' to be deleted".to_string());
+    }
+
+    if std::path::Path::new(&path).exists() {
+        fs::remove_dir_all(&path).map_err(|e| format!("Failed to remove staging dir: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn validate_immich(url: String, api_key: String) -> Result<String, String> {
     let client = reqwest::blocking::Client::new();
 
@@ -140,6 +200,8 @@ pub fn run() {
             load_settings,
             save_settings,
             find_zips,
+            copy_to_staging,
+            clean_staging,
             validate_immich,
             // Metadata commands
             metadata::read_exif_metadata,
