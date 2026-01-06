@@ -1,8 +1,8 @@
-import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp, XCircle, Image, Cloud, Archive, Camera, FolderTree, Tag, Plus, Trash2, Edit2, Save, AlertCircle, Search } from "lucide-react";
+import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp, XCircle, Image, Cloud, Archive, Camera, FolderTree, Tag, Plus, Search } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { Command } from "@tauri-apps/plugin-shell";
+import { Command, Child } from "@tauri-apps/plugin-shell";
 
 // Types for source tagging
 interface SourceTag {
@@ -61,9 +61,7 @@ export function Ingest() {
   const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [destPath, setDestPath] = useState<string | null>(null);
   const [defaultArchivePath, setDefaultArchivePath] = useState<string | null>(null);
-  // Custom binary paths from settings
-  const [phockupPath, setPhockupPath] = useState<string>('');
-  const [immichGoPath, setImmichGoPath] = useState<string>('');
+
   const [status, setStatus] = useState<'idle' | 'scanning' | 'copying' | 'tagging' | 'organizing' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLogsExpanded, setIsLogsExpanded] = useState(false);
@@ -73,10 +71,11 @@ export function Ingest() {
   // Tagging State
   const [sourceTags, setSourceTags] = useState<SourceTag[]>([]);
   const [newTagName, setNewTagName] = useState("");
-  const [editingTag, setEditingTag] = useState<string | null>(null);
+  const [enableTagging, setEnableTagging] = useState(true);
+
   const [cameraModels, setCameraModels] = useState<CameraModelGroup[]>([]);
   const [directoryGroups, setDirectoryGroups] = useState<DirectoryGroup[]>([]);
-  const [scannedFiles, setScannedFiles] = useState<FileMetadataInfo[]>([]);
+
   const [isScanned, setIsScanned] = useState(false);
 
   // Log buffering
@@ -135,7 +134,7 @@ export function Ingest() {
       if (selected) {
         setSourcePath(selected as string);
         setIsScanned(false); // Reset scan state on new source
-        setScannedFiles([]);
+
       }
     } catch (err) {
       console.error("Failed to select source:", err);
@@ -216,7 +215,6 @@ export function Ingest() {
   const scanSource = async () => {
     if (!sourcePath) return;
     setStatus('scanning');
-    setScannedFiles([]);
     setCameraModels([]);
     setDirectoryGroups([]);
 
@@ -226,7 +224,7 @@ export function Ingest() {
         path: sourcePath,
       });
 
-      setScannedFiles(results);
+
       setIsScanned(true);
       addToLogs(`Found ${results.length} files.`);
 
@@ -388,6 +386,35 @@ export function Ingest() {
       if (ingestType === 'local') {
         // MULTI-STEP WORKFLOW
 
+        // If tagging is disabled, skip staging and tagging -> Run Phockup directly on source
+        if (!enableTagging) {
+          setStatus('organizing');
+          addToLogs('Tagging skipped. Running Phockup on source directly...');
+          const phockupCmd = navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup';
+
+          await new Promise<void>(async (resolve, reject) => {
+            const threads = navigator.hardwareConcurrency || 4;
+            // Source is SOURCE now
+            const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '-c', threads.toString()];
+            // Copy vs Move based on user selection
+            if (selectedStrategy === 'move') {
+              args.push('--move');
+            }
+
+            addToLogs(`Command: ${phockupCmd} ${args.join(' ')}`);
+
+            let command;
+            try {
+              command = Command.create(phockupCmd, args);
+            } catch (e) {
+              reject(e);
+              return;
+            }
+            await spawnAndTrack(command, resolve, reject);
+          });
+        } else {
+        // 1. Copy to Staging
+
         // 1. Copy to Staging
         setStatus('copying');
         const stagingPath = `${destPath}/staging`; // Or custom logic
@@ -505,9 +532,7 @@ export function Ingest() {
         setStatus('organizing');
         addToLogs(`Running Phockup on staging...`);
 
-        const phockupCmd = phockupPath
-          ? phockupPath
-          : (navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup');
+          const phockupCmd = navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup';
 
         const runPhockup = () => {
           return new Promise<void>(async (resolve, reject) => {
@@ -545,6 +570,7 @@ export function Ingest() {
         } catch (e) {
           addToLogs(`Warning: Failed to clean staging path: ${e}`);
         }
+        } // End of tagging enabled block
 
       }
       // Immich-Go logic remains similar but from Staging? 
@@ -571,7 +597,7 @@ export function Ingest() {
 
   const spawnAndTrack = (command: Command<string>, resolve: (val?: void) => void, reject: (err: any) => void) => {
     return new Promise<void>(async (internalResolve) => {
-      let child: any = null;
+      let child: Child | null = null;
 
       command.on('close', (data: { code: number | null, signal: number | null }) => {
         if (cancelledRef.current) return;
@@ -713,13 +739,24 @@ export function Ingest() {
             )}
           </div>
 
-          {/* Tagging Panel (Visible after scan) */}
-          {sourcePath && (
-            <div className="glass-card p-8">
-              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+          {/* Tagging Panel (Always Visible) */}
+          <div className={`glass-card p-8 transition-opacity ${!enableTagging ? 'opacity-50 grayscale' : ''}`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
                 <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">2</span>
                 Assign Tags
               </h2>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <span className="text-sm font-medium text-slate-300">Enable Tagging & Staging</span>
+                <div className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={enableTagging} onChange={(e) => setEnableTagging(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </div>
+              </label>
+            </div>
+
+            {enableTagging && (
+              <>
 
               {/* Tag Management */}
               <div className="mb-6">
@@ -808,12 +845,20 @@ export function Ingest() {
               )}
 
               {cameraModels.length === 0 && directoryGroups.length === 0 && (
-                <div className="text-center py-4 text-slate-500 text-sm bg-slate-900/30 rounded-lg border border-dashed border-slate-800">
-                  Scan source to find cameras and directories
+                  <div className="text-center py-8 text-slate-500 text-sm bg-slate-900/30 rounded-lg border border-dashed border-slate-800">
+                    {!sourcePath ? (
+                      <p>Select a source folder in Step 1 to scan for cameras and directories</p>
+                    ) : !isScanned ? (
+                      <p>Scan source to find cameras and directories</p>
+                    ) : (
+                      <p>No cameras or directories found in source</p>
+                    )}
                 </div>
               )}
-            </div>
-          )}
+              </>
+            )}
+          </div>
+
 
           {/* Destination Selection */}
           <div className="glass-card p-8">
