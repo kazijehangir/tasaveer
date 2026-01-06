@@ -4,11 +4,19 @@ use tauri::Manager;
 
 mod metadata;
 mod dedup;
+mod state; // Add state module
+
+use state::AppState; // Import AppState
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+#[tauri::command]
+fn cancel_operation(state: tauri::State<AppState>, operation_id: String) {
+    state.cancel(&operation_id);
 }
 
 #[tauri::command]
@@ -192,13 +200,16 @@ pub fn run() {
     fix_path_env();
 
     tauri::Builder::default()
+        .manage(AppState::new()) // Initialize AppState
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             load_settings,
             save_settings,
+            cancel_operation, // Add cancel command
             find_zips,
             copy_to_staging,
             clean_staging,

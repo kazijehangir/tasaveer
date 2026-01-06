@@ -78,9 +78,23 @@ pub fn check_czkawka() -> Result<String, String> {
     }
 }
 
-/// Find exact duplicate files using hash comparison
+#[derive(Clone, serde::Serialize)]
+struct DedupProgress {
+    id: String,
+    status: String,
+}
+
+/// Find exact duplicate files using hash comparison (async, cancellable)
 #[tauri::command]
-pub fn find_duplicates(path: String, czkawka_path: Option<String>) -> Result<DedupResult, String> {
+pub async fn find_duplicates(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, crate::state::AppState>,
+    path: String,
+    czkawka_path: Option<String>,
+    operation_id: String,
+) -> Result<DedupResult, String> {
+    use tauri::{Emitter, Manager};
+    
     let czkawka = czkawka_path.unwrap_or_else(|| "czkawka_cli".to_string());
     
     // Create a temp file for JSON output
@@ -88,18 +102,33 @@ pub fn find_duplicates(path: String, czkawka_path: Option<String>) -> Result<Ded
     let output_file = temp_dir.join("tasaveer_dup_results.json");
     let output_path = output_file.to_string_lossy().to_string();
 
-    // czkawka 10.0 CLI: dup -d <path> -C <json-file>
-    // -C = compact JSON output
-    // Note: czkawka uses non-zero exit codes even on success (e.g., code 11)
-    // so we ignore exit code and just try to read the output file
-    let _ = Command::new(&czkawka)
+    // Emit indeterminate progress
+    let _ = app_handle.emit("dedup-progress", DedupProgress {
+        id: operation_id.clone(),
+        status: "Running czkawka scan...".to_string()
+    });
+
+    // Spawn process
+    let mut child = Command::new(&czkawka)
         .args([
             "dup",
             "-d", &path,
             "-C", &output_path,
         ])
-        .output()
-        .map_err(|e| format!("Failed to run czkawka: {}", e))?;
+        .spawn()
+        .map_err(|e| format!("Failed to spawn czkawka: {}", e))?;
+        
+    let pid = child.id();
+    
+    // register process for cancellation
+    state.running_processes.lock().unwrap().insert(operation_id.clone(), pid);
+    
+    // Wait for output
+    let output = child.wait_with_output()
+        .map_err(|e| format!("Failed to wait for czkawka: {}", e))?;
+        
+    // remove from running processes
+    state.running_processes.lock().unwrap().remove(&operation_id);
 
     // Read and parse the JSON output (czkawka creates the file even with non-zero exit)
     let json_content = std::fs::read_to_string(&output_file)
@@ -108,26 +137,45 @@ pub fn find_duplicates(path: String, czkawka_path: Option<String>) -> Result<Ded
     parse_duplicate_json(&json_content)
 }
 
-/// Find similar images using perceptual hash
+/// Find similar images using perceptual hash (async, cancellable)
 #[tauri::command]
-pub fn find_similar_images(path: String, czkawka_path: Option<String>) -> Result<SimilarResult, String> {
+pub async fn find_similar_images(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, crate::state::AppState>,
+    path: String,
+    czkawka_path: Option<String>,
+    operation_id: String,
+) -> Result<SimilarResult, String> {
+    use tauri::{Emitter, Manager};
+    
     let czkawka = czkawka_path.unwrap_or_else(|| "czkawka_cli".to_string());
     
     let temp_dir = std::env::temp_dir();
     let output_file = temp_dir.join("tasaveer_similar_results.json");
     let output_path = output_file.to_string_lossy().to_string();
 
-    // czkawka 10.0 CLI: image -d <path> -C <json-file>
-    // 'image' is the subcommand for similar images
-    // Note: czkawka uses non-zero exit codes even on success
-    let _ = Command::new(&czkawka)
+    // Emit indeterminate progress
+    let _ = app_handle.emit("similar-progress", DedupProgress {
+        id: operation_id.clone(),
+        status: "Scanning for similar images...".to_string()
+    });
+
+    let mut child = Command::new(&czkawka)
         .args([
             "image",
             "-d", &path,
             "-C", &output_path,
         ])
-        .output()
-        .map_err(|e| format!("Failed to run czkawka: {}", e))?;
+        .spawn()
+        .map_err(|e| format!("Failed to spawn czkawka: {}", e))?;
+        
+    let pid = child.id();
+    state.running_processes.lock().unwrap().insert(operation_id.clone(), pid);
+    
+    let output = child.wait_with_output()
+        .map_err(|e| format!("Failed to wait for czkawka: {}", e))?;
+        
+    state.running_processes.lock().unwrap().remove(&operation_id);
 
     let json_content = std::fs::read_to_string(&output_file)
         .map_err(|e| format!("czkawka did not produce output file. Is czkawka_cli installed? Error: {}", e))?;

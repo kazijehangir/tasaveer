@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
@@ -88,8 +89,28 @@ export function Clean() {
     // Error state
     const [error, setError] = useState<string | null>(null);
 
+    // Progress state
+    const [progress, setProgress] = useState<string | number | null>(null);
+
     // Load settings on mount
     useEffect(() => {
+        let unlistenScan: () => void;
+        let unlistenDedup: () => void;
+        let unlistenSimilar: () => void;
+
+        async function setupListeners() {
+            unlistenScan = await listen<number>("scan-progress", (event) => {
+                setProgress(`Scanned ${event.payload} files...`);
+            });
+            unlistenDedup = await listen<string>("dedup-progress", (event) => {
+                setProgress(event.payload);
+            });
+            unlistenSimilar = await listen<string>("similar-progress", (event) => {
+                setProgress(event.payload);
+            });
+        }
+        setupListeners();
+
         async function loadSettings() {
             try {
                 const settingsStr = await invoke<string>("load_settings");
@@ -111,7 +132,32 @@ export function Clean() {
             }
         }
         loadSettings();
+
+        return () => {
+            if (unlistenScan) unlistenScan();
+            if (unlistenDedup) unlistenDedup();
+            if (unlistenSimilar) unlistenSimilar();
+        };
     }, []);
+
+    const handleCancel = async () => {
+        if (!isScanning) return;
+
+        let operationId = "";
+        if (activeTab === "metadata") operationId = "scan_missing_dates";
+        else if (activeTab === "duplicates") operationId = "find_duplicates";
+        else if (activeTab === "similar") operationId = "find_similar_images";
+
+        if (operationId) {
+            try {
+                await invoke("cancel_operation", { operationId });
+            } catch (err) {
+                console.error("Failed to cancel:", err);
+            }
+        }
+        setIsScanning(false);
+        setProgress(null);
+    };
 
     const handleSelectPath = async () => {
         const selected = await open({
@@ -129,6 +175,7 @@ export function Clean() {
         setIsScanning(true);
         setMetadataResults([]);
         setError(null);
+        setProgress("Starting scan...");
         try {
             console.log("Scanning metadata for:", archivePath);
             const results = await invoke<FileMetadataInfo[]>("scan_missing_dates", {
@@ -141,6 +188,7 @@ export function Clean() {
             setError(`Metadata scan failed: ${err}`);
         } finally {
             setIsScanning(false);
+            setProgress(null);
         }
     };
 
@@ -172,6 +220,7 @@ export function Clean() {
         setIsScanning(true);
         setDupResults(null);
         setError(null);
+        setProgress("Initializing duplicate scan...");
         try {
             console.log("Scanning duplicates in:", archivePath);
             const results = await invoke<DedupResult>("find_duplicates", {
@@ -185,6 +234,7 @@ export function Clean() {
             setError(`Duplicate scan failed: ${err}`);
         } finally {
             setIsScanning(false);
+            setProgress(null);
         }
     };
 
@@ -193,6 +243,7 @@ export function Clean() {
         setIsScanning(true);
         setSimilarResults(null);
         setError(null);
+        setProgress("Initializing similar image scan...");
         try {
             console.log("Scanning similar images in:", archivePath);
             const results = await invoke<SimilarResult>("find_similar_images", {
@@ -206,6 +257,7 @@ export function Clean() {
             setError(`Similar scan failed: ${err}`);
         } finally {
             setIsScanning(false);
+            setProgress(null);
         }
     };
 
@@ -354,14 +406,33 @@ export function Clean() {
                                     />
                                     Show only missing dates
                                 </label>
-                                <button
-                                    onClick={handleScanMetadata}
-                                    disabled={!archivePath || isScanning}
-                                    className="btn-primary px-4 py-2 flex items-center gap-2"
-                                >
-                                    <Search className="w-4 h-4" />
-                                    {isScanning ? "Scanning..." : "Scan"}
-                                </button>
+                                {isScanning ? (
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-xs text-slate-400 font-mono animate-pulse">
+                                                {progress || "Scanning..."}
+                                            </span>
+                                            <div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
+                                                <div className="h-full bg-purple-500 animate-indeterminate-bar" />
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={handleCancel}
+                                            className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : (
+                                        <button
+                                            onClick={handleScanMetadata}
+                                            disabled={!archivePath}
+                                            className="btn-primary px-4 py-2 flex items-center gap-2"
+                                        >
+                                            <Search className="w-4 h-4" />
+                                            Scan
+                                        </button>
+                                )}
                             </div>
                         </div>
 
@@ -471,14 +542,33 @@ export function Clean() {
                                 <Copy className="w-5 h-5 text-blue-400" />
                                 Exact Duplicates
                             </h2>
-                            <button
-                                onClick={handleScanDuplicates}
-                                disabled={!archivePath || isScanning || !czkawkaStatus?.includes("found")}
-                                className="btn-primary px-4 py-2 flex items-center gap-2"
-                            >
-                                <Search className="w-4 h-4" />
-                                {isScanning ? "Scanning..." : "Find Duplicates"}
-                            </button>
+                            {isScanning ? (
+                                <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs text-slate-400 font-mono animate-pulse">
+                                            {progress || "Processing..."}
+                                        </span>
+                                        <div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
+                                            <div className="h-full bg-blue-500 animate-indeterminate-bar" />
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleCancel}
+                                        className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            ) : (
+                                    <button
+                                        onClick={handleScanDuplicates}
+                                        disabled={!archivePath || !czkawkaStatus?.includes("found")}
+                                        className="btn-primary px-4 py-2 flex items-center gap-2"
+                                    >
+                                        <Search className="w-4 h-4" />
+                                        Find Duplicates
+                                    </button>
+                            )}
                         </div>
 
                         {dupResults && (
@@ -607,14 +697,33 @@ export function Clean() {
                                     Review only — these may be intentional variations (burst shots, edits)
                                 </p>
                             </div>
-                            <button
-                                onClick={handleScanSimilar}
-                                disabled={!archivePath || isScanning || !czkawkaStatus?.includes("found")}
-                                className="btn-primary px-4 py-2 flex items-center gap-2"
-                            >
-                                <Search className="w-4 h-4" />
-                                {isScanning ? "Scanning..." : "Find Similar"}
-                            </button>
+                            {isScanning ? (
+                                <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs text-slate-400 font-mono animate-pulse">
+                                            {progress || "Processing..."}
+                                        </span>
+                                        <div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
+                                            <div className="h-full bg-teal-500 animate-indeterminate-bar" />
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleCancel}
+                                        className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            ) : (
+                                    <button
+                                        onClick={handleScanSimilar}
+                                        disabled={!archivePath || !czkawkaStatus?.includes("found")}
+                                        className="btn-primary px-4 py-2 flex items-center gap-2"
+                                    >
+                                        <Search className="w-4 h-4" />
+                                        Find Similar
+                                    </button>
+                            )}
                         </div>
 
                         {similarResults && (

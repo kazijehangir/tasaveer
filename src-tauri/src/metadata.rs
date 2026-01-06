@@ -294,17 +294,45 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
 }
 
 /// Scan a directory recursively for media files
+#[derive(Clone, serde::Serialize)]
+struct ScanProgress {
+    id: String,
+    count: usize,
+}
+
+/// Scan a directory recursively for media files with progress and cancellation
 #[tauri::command]
-pub fn scan_missing_dates(path: String) -> Result<Vec<FileMetadataInfo>, String> {
+pub async fn scan_missing_dates(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, crate::state::AppState>,
+    path: String,
+    operation_id: String,
+) -> Result<Vec<FileMetadataInfo>, String> {
     use walkdir::WalkDir;
+    use tauri::{Emitter, Manager};
+    use std::sync::atomic::Ordering;
+
+    let cancel_token = state.register_token(&operation_id);
+    
+    // First count total files for progress (optional but good UX)
+    // This might be slow on huge dirs, so maybe we just send "processed count" without total?
+    // Let's do a quick count first if possible, or just emit processed count.
     
     let mut results = Vec::new();
+    let mut scanned_count = 0;
     
-    for entry in WalkDir::new(&path)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    let walker = WalkDir::new(&path).follow_links(true);
+    
+    // We can't easily count efficiently without walking twice.
+    // Let's walk once and emit progress.
+    
+    for entry in walker.into_iter().filter_map(|e| e.ok()) {
+        // Check cancellation
+        if cancel_token.load(Ordering::Relaxed) {
+             state.remove_token(&operation_id);
+             return Err("Operation cancelled".to_string());
+        }
+
         let file_path = entry.path();
         
         // Skip directories
@@ -353,8 +381,19 @@ pub fn scan_missing_dates(path: String) -> Result<Vec<FileMetadataInfo>, String>
             extracted_date,
             camera_model,
         });
+        
+        scanned_count += 1;
+        
+        // Emit progress every 10 files to avoid flooding events
+        if scanned_count % 10 == 0 {
+            let _ = app_handle.emit("scan-progress", ScanProgress { 
+                id: operation_id.clone(), 
+                count: scanned_count 
+            });
+        }
     }
 
+    state.remove_token(&operation_id);
     Ok(results)
 }
 
