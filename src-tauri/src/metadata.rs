@@ -237,21 +237,48 @@ pub fn write_exif_date_if_missing(file_path: String, date: String, time: Option<
     }
 }
 
-/// Write keywords/tags to EXIF
+/// Write keywords/tags to EXIF, avoiding duplicates
 #[tauri::command]
 pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<String, String> {
     if keywords.is_empty() {
         return Ok("No keywords to write".to_string());
     }
 
-    let keywords_str = keywords.join("; ");
+    // First, read existing keywords
+    let existing_output = Command::new("exiftool")
+        .args(["-Keywords", "-s", "-s", "-s", &file_path])
+        .output()
+        .map_err(|e| format!("Failed to read existing keywords: {}", e))?;
+
+    let existing_keywords: std::collections::HashSet<String> = if existing_output.status.success() {
+        String::from_utf8_lossy(&existing_output.stdout)
+            .trim()
+            .split(", ")
+            .filter(|s| !s.is_empty())
+            .map(|s| s.trim().to_string())
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
+    // Merge with new keywords, avoiding duplicates
+    let mut all_keywords: std::collections::HashSet<String> = existing_keywords;
+    for kw in &keywords {
+        all_keywords.insert(kw.clone());
+    }
+
+    // Convert back to sorted vec for consistent output
+    let mut merged: Vec<String> = all_keywords.into_iter().collect();
+    merged.sort();
+
+    let keywords_str = merged.join(", ");
     
     let output = Command::new("exiftool")
         .args([
             "-overwrite_original",
             &format!("-XPKeywords={}", keywords_str),
-            &format!("-Keywords={}", keywords.join(", ")),
-            &format!("-IPTC:Keywords={}", keywords.join(", ")),
+            &format!("-Keywords={}", keywords_str),
+            &format!("-IPTC:Keywords={}", keywords_str),
             &file_path,
         ])
         .output()
@@ -265,16 +292,18 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
     }
 }
 
-/// Scan a directory for files missing DateTimeOriginal
+/// Scan a directory recursively for media files
 #[tauri::command]
 pub fn scan_missing_dates(path: String) -> Result<Vec<FileMetadataInfo>, String> {
+    use walkdir::WalkDir;
+    
     let mut results = Vec::new();
     
-    let entries = std::fs::read_dir(&path)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
-
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
+    for entry in WalkDir::new(&path)
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let file_path = entry.path();
         
         // Skip directories

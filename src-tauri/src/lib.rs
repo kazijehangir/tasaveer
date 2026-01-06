@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Write;
+use tauri::Manager;
 
 mod metadata;
 mod dedup;
@@ -11,18 +12,32 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-fn load_settings() -> Result<String, String> {
-    let path = "settings.json";
-    match fs::read_to_string(path) {
+fn load_settings(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let data_dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    
+    // Create the directory if it doesn't exist
+    fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create data dir: {}", e))?;
+    
+    let settings_path = data_dir.join("settings.json");
+    
+    match fs::read_to_string(&settings_path) {
         Ok(content) => Ok(content),
         Err(_) => Ok("{}".to_string()), // Return empty JSON if file doesn't exist
     }
 }
 
 #[tauri::command]
-fn save_settings(settings: String) -> Result<(), String> {
-    let path = "settings.json";
-    let mut file = fs::File::create(path).map_err(|e| e.to_string())?;
+fn save_settings(app_handle: tauri::AppHandle, settings: String) -> Result<(), String> {
+    let data_dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    
+    // Create the directory if it doesn't exist
+    fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create data dir: {}", e))?;
+    
+    let settings_path = data_dir.join("settings.json");
+    
+    let mut file = fs::File::create(&settings_path).map_err(|e| e.to_string())?;
     file.write_all(settings.as_bytes())
         .map_err(|e| e.to_string())?;
     Ok(())
