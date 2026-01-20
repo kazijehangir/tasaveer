@@ -1,5 +1,6 @@
 # Tasaveer
 
+<!-- markdownlint-disable -->
 <img align="left" width="80" height="80" hspace="20" src="public/app-icon.png">
 
 Tasaveer (/təsˌviːr/, Urdu: تصاویر, lit. 'photographs') is a media management tool which simplifies the process of importing media from various sources (like SD cards, Google Photos Takeout, and iCloud Takeout) into an organized local archive.
@@ -110,7 +111,7 @@ You can override the bundled or PATH binaries with your own custom installations
 ### External Dependencies Reference
 
 | Tool | Bundled | Repository |
-|------|---------|------------|
+| --- | --- | --- |
 | **immich-go** | ✅ Yes | [simulot/immich-go](https://github.com/simulot/immich-go) |
 | **phockup** | ❌ No (requires Python) | [ivandokov/phockup](https://github.com/ivandokov/phockup) |
 | **ExifTool** | ❌ No (required by phockup) | [exiftool.org](https://exiftool.org/) |
