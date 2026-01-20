@@ -7,7 +7,6 @@ Tasaveer (/təsˌviːr/, Urdu: تصاویر, lit. 'photographs') is a media mana
 [![Tests](https://github.com/kazijehangir/tasaveer/actions/workflows/test.yml/badge.svg)](https://github.com/kazijehangir/tasaveer/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/kazijehangir/tasaveer/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/kazijehangir/tasaveer)
 
-
 ## Features
 
 - **Ingest Workflow**: Streamlined process to select source and destination paths.
@@ -17,26 +16,24 @@ Tasaveer (/təsˌviːr/, Urdu: تصاویر, lit. 'photographs') is a media mana
 - **Control**: Start and cancel operations safely at any time.
 - **Monitoring**: Real-time progress logs.
 
-
-
 ## Workflow
 
 Tasaveer is designed around a 4-step workflow to ensure your media library is pristine before it reaches your permanent storage or Immich server.
 
 ![Tasaveer Home Dashboard](public/home-screenshot.png)
 
-1.  **Ingest**
+1. **Ingest**
     Copy over and extract images and videos from various sources like HDD backups, Google Photos Takeout, and SD cards. This step performs basic hash-based deduplication using tools like `phockup`.
 
     ![Ingest Workflow](public/ingest-screenshot.png)
 
-2.  **Clean and Dedup**
+2. **Clean and Dedup**
     Extract missing metadata (e.g., dates from WhatsApp images) and perform advanced similarity-based deduplication using **Czkawka**. This step allows for stacking similar pictures and deduplicating lower-resolution copies.
 
-3.  **Tag and Categorize**
+3. **Tag and Categorize**
     Separate and organize media into logical groups (e.g., Family Shared vs. Personal Phone). The end result is a structured set of folders ready to be added as External Libraries in Immich.
 
-4.  **Sync to Immich**
+4. **Sync to Immich**
     Link the organized folders as External Libraries in Immich and trigger a library scan to update your cloud archive.
 
 ## Installation and Prerequisites
@@ -68,16 +65,19 @@ pipx install git+https://github.com/ivandokov/phockup.git
 
 1. **Install Python 3** (if not already installed):
    - Download from [python.org](https://www.python.org/downloads/windows/) or use Winget:
+
    ```powershell
    winget install Python.Python.3.13
    ```
 
 2. **Install ExifTool** (required by phockup):
+
    ```powershell
    winget install OliverBetz.ExifTool --accept-package-agreements --accept-source-agreements
    ```
 
 3. **Install phockup**:
+
    ```powershell
    # Clone phockup to your local Programs folder
    git clone --depth 1 https://github.com/ivandokov/phockup.git "$env:LOCALAPPDATA\Programs\phockup"
@@ -93,6 +93,7 @@ pipx install git+https://github.com/ivandokov/phockup.git
    ```
 
 4. **Restart your terminal** to pick up the new PATH, then verify:
+
    ```powershell
    phockup --version
    ```
@@ -100,6 +101,7 @@ pipx install git+https://github.com/ivandokov/phockup.git
 ### Custom Binary Paths
 
 You can override the bundled or PATH binaries with your own custom installations in **Settings → Advanced: Custom Binary Paths**. This is useful if you want to:
+
 - Use a specific version of immich-go
 - Point to phockup installed in a non-standard location
 
@@ -123,21 +125,23 @@ This template should help get you started developing with Tauri, React and Types
 
 ### Windows Development Setup
 
-1.  **Install Rust**:
-    *   Download and run `rustup-init.exe` from [rust-lang.org](https://www.rust-lang.org/tools/install).
-    *   Or use Winget: `winget install Rustlang.Rustup`.
-2.  **C++ Build Tools**:
-    *   Ensure "Desktop development with C++" is installed via Visual Studio Build Tools.
+1. **Install Rust**:
+    - Download and run `rustup-init.exe` from [rust-lang.org](https://www.rust-lang.org/tools/install).
+    - Or use Winget: `winget install Rustlang.Rustup`.
+2. **C++ Build Tools**:
+    - Ensure "Desktop development with C++" is installed via Visual Studio Build Tools.
 
 ### Running Tests
 
 Run all frontend tests:
+
 ```bash
 npm test              # Watch mode
 npm run test:coverage # With coverage report
 ```
 
 Run Rust backend tests:
+
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 ```
