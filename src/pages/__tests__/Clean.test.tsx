@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Clean } from '../Clean';
 import { vi, Mock } from 'vitest';
 import * as tauriCore from '@tauri-apps/api/core';

@@ -5,6 +5,7 @@ pub mod binaries;
 mod dedup;
 mod exiftool_daemon;
 mod metadata;
+mod organize;
 mod state; // Add state module
 
 use state::AppState; // Import AppState
@@ -194,6 +195,9 @@ pub fn run() {
             dedup::find_duplicates,
             dedup::find_similar_images,
             dedup::delete_to_trash,
+            // Organize commands
+            organize::preview_organize,
+            organize::run_organize,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
