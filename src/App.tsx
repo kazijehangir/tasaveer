@@ -14,7 +14,6 @@ function App() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="ingest" element={<Ingest />} />
-          <Route path="ingest" element={<Ingest />} />
           <Route path="clean" element={<Clean />} />
           <Route path="organize" element={<Organize />} />
           <Route path="sync" element={<Sync />} />

@@ -24,9 +24,9 @@ pub struct ExifMetadata {
 /// Result of date extraction from filename
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtractedDate {
-    pub date: String,        // Format: YYYY-MM-DD
+    pub date: String,         // Format: YYYY-MM-DD
     pub time: Option<String>, // Format: HH:MM:SS if available
-    pub source: String,      // e.g., "WhatsApp", "Screenshot", "Android Camera"
+    pub source: String,       // e.g., "WhatsApp", "Screenshot", "Android Camera"
 }
 
 /// File info with metadata status
@@ -39,7 +39,7 @@ pub struct FileMetadataInfo {
 }
 
 /// Extract date from common filename patterns
-/// 
+///
 /// Supported patterns:
 /// - WhatsApp Android: IMG-20240115-WA0042.jpg
 /// - WhatsApp iOS: WhatsApp Image 2024-01-15 at 10.30.45.jpeg
@@ -58,7 +58,9 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     }
 
     // WhatsApp iOS: WhatsApp Image 2024-01-15 at 10.30.45
-    let whatsapp_ios = Regex::new(r"WhatsApp.*(\d{4})-(\d{2})-(\d{2})(?:\s+at\s+(\d{2})\.(\d{2})\.(\d{2}))?").unwrap();
+    let whatsapp_ios =
+        Regex::new(r"WhatsApp.*(\d{4})-(\d{2})-(\d{2})(?:\s+at\s+(\d{2})\.(\d{2})\.(\d{2}))?")
+            .unwrap();
     if let Some(caps) = whatsapp_ios.captures(filename) {
         let time = if caps.get(4).is_some() {
             Some(format!("{}:{}:{}", &caps[4], &caps[5], &caps[6]))
@@ -73,7 +75,9 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     }
 
     // Screenshot Mac: Screenshot 2024-01-15 at 14.30.00
-    let screenshot_mac = Regex::new(r"Screenshot\s+(\d{4})-(\d{2})-(\d{2})\s+at\s+(\d{2})\.(\d{2})\.(\d{2})").unwrap();
+    let screenshot_mac =
+        Regex::new(r"Screenshot\s+(\d{4})-(\d{2})-(\d{2})\s+at\s+(\d{2})\.(\d{2})\.(\d{2})")
+            .unwrap();
     if let Some(caps) = screenshot_mac.captures(filename) {
         return Some(ExtractedDate {
             date: format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]),
@@ -83,14 +87,15 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     }
 
     // Android Camera: 20240115_143000.jpg or IMG_20240115_143000.jpg
-    let android_camera = Regex::new(r"(?:IMG_)?(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})").unwrap();
+    let android_camera =
+        Regex::new(r"(?:IMG_)?(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})").unwrap();
     if let Some(caps) = android_camera.captures(filename) {
         let year: u32 = caps[1].parse().unwrap_or(0);
         let month: u32 = caps[2].parse().unwrap_or(0);
         let day: u32 = caps[3].parse().unwrap_or(0);
-        
+
         // Validate it looks like a real date
-        if year >= 1990 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31 {
+        if (1990..=2100).contains(&year) && (1..=12).contains(&month) && (1..=31).contains(&day) {
             return Some(ExtractedDate {
                 date: format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]),
                 time: Some(format!("{}:{}:{}", &caps[4], &caps[5], &caps[6])),
@@ -105,9 +110,9 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
         let year: u32 = caps[1].parse().unwrap_or(0);
         let month: u32 = caps[2].parse().unwrap_or(0);
         let day: u32 = caps[3].parse().unwrap_or(0);
-        
+
         // Validate it looks like a real date
-        if year >= 1990 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31 {
+        if (1990..=2100).contains(&year) && (1..=12).contains(&month) && (1..=31).contains(&day) {
             return Some(ExtractedDate {
                 date: format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]),
                 time: None,
@@ -151,7 +156,7 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
     }
 
     let data = &parsed[0];
-    
+
     // Parse keywords from both Keywords and XPKeywords
     let mut keywords = Vec::new();
     if let Some(kw) = data.get("Keywords") {
@@ -178,11 +183,26 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
 
     Ok(ExifMetadata {
         file_path,
-        date_time_original: data.get("DateTimeOriginal").and_then(|v| v.as_str()).map(|s| s.to_string()),
-        create_date: data.get("CreateDate").and_then(|v| v.as_str()).map(|s| s.to_string()),
-        make: data.get("Make").and_then(|v| v.as_str()).map(|s| s.to_string()),
-        model: data.get("Model").and_then(|v| v.as_str()).map(|s| s.to_string()),
-        software: data.get("Software").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        date_time_original: data
+            .get("DateTimeOriginal")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        create_date: data
+            .get("CreateDate")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        make: data
+            .get("Make")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        model: data
+            .get("Model")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        software: data
+            .get("Software")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
         keywords,
     })
 }
@@ -191,21 +211,23 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
 #[tauri::command]
 pub fn get_camera_model(file_path: String) -> Result<Option<String>, String> {
     match read_exif_metadata(file_path) {
-        Ok(metadata) => {
-            match (metadata.make, metadata.model) {
-                (Some(make), Some(model)) => Ok(Some(format!("{} {}", make.trim(), model.trim()))),
-                (None, Some(model)) => Ok(Some(model)),
-                (Some(make), None) => Ok(Some(make)),
-                (None, None) => Ok(None),
-            }
-        }
+        Ok(metadata) => match (metadata.make, metadata.model) {
+            (Some(make), Some(model)) => Ok(Some(format!("{} {}", make.trim(), model.trim()))),
+            (None, Some(model)) => Ok(Some(model)),
+            (Some(make), None) => Ok(Some(make)),
+            (None, None) => Ok(None),
+        },
         Err(_) => Ok(None), // No EXIF data is not an error for this function
     }
 }
 
 /// Write EXIF date to file ONLY if DateTimeOriginal is missing
 #[tauri::command]
-pub fn write_exif_date_if_missing(file_path: String, date: String, time: Option<String>) -> Result<String, String> {
+pub fn write_exif_date_if_missing(
+    file_path: String,
+    date: String,
+    time: Option<String>,
+) -> Result<String, String> {
     // First check if date already exists
     if let Ok(metadata) = read_exif_metadata(file_path.clone()) {
         if metadata.date_time_original.is_some() {
@@ -272,7 +294,7 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
     merged.sort();
 
     let keywords_str = merged.join(", ");
-    
+
     let output = Command::new("exiftool")
         .args([
             "-overwrite_original",
@@ -308,33 +330,33 @@ pub async fn scan_missing_dates(
     path: String,
     operation_id: String,
 ) -> Result<Vec<FileMetadataInfo>, String> {
-    use walkdir::WalkDir;
-    use tauri::{Emitter, Manager};
     use std::sync::atomic::Ordering;
+    use tauri::Emitter;
+    use walkdir::WalkDir;
 
     let cancel_token = state.register_token(&operation_id);
-    
+
     // First count total files for progress (optional but good UX)
     // This might be slow on huge dirs, so maybe we just send "processed count" without total?
     // Let's do a quick count first if possible, or just emit processed count.
-    
+
     let mut results = Vec::new();
     let mut scanned_count = 0;
-    
+
     let walker = WalkDir::new(&path).follow_links(true);
-    
+
     // We can't easily count efficiently without walking twice.
     // Let's walk once and emit progress.
-    
+
     for entry in walker.into_iter().filter_map(|e| e.ok()) {
         // Check cancellation
         if cancel_token.load(Ordering::Relaxed) {
-             state.remove_token(&operation_id);
-             return Err("Operation cancelled".to_string());
+            state.remove_token(&operation_id);
+            return Err("Operation cancelled".to_string());
         }
 
         let file_path = entry.path();
-        
+
         // Skip directories
         if file_path.is_dir() {
             continue;
@@ -343,9 +365,19 @@ pub async fn scan_missing_dates(
         // Check if it's an image or video
         if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
             let ext_lower = ext.to_lowercase();
-            if !matches!(ext_lower.as_str(), 
-                "jpg" | "jpeg" | "png" | "heic" | "heif" | "webp" | 
-                "mp4" | "mov" | "avi" | "mkv" | "m4v"
+            if !matches!(
+                ext_lower.as_str(),
+                "jpg"
+                    | "jpeg"
+                    | "png"
+                    | "heic"
+                    | "heif"
+                    | "webp"
+                    | "mp4"
+                    | "mov"
+                    | "avi"
+                    | "mkv"
+                    | "m4v"
             ) {
                 continue;
             }
@@ -354,9 +386,7 @@ pub async fn scan_missing_dates(
         }
 
         let file_path_str = file_path.to_string_lossy().to_string();
-        let filename = file_path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
+        let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
         // Try to read EXIF
         let (has_date, camera_model) = match read_exif_metadata(file_path_str.clone()) {
@@ -367,7 +397,7 @@ pub async fn scan_missing_dates(
                     (None, Some(model)) => Some(model),
                     (Some(make), None) => Some(make),
                     (None, None) => None,
-                }
+                },
             ),
             Err(_) => (false, None),
         };
@@ -381,15 +411,18 @@ pub async fn scan_missing_dates(
             extracted_date,
             camera_model,
         });
-        
+
         scanned_count += 1;
-        
+
         // Emit progress every 10 files to avoid flooding events
         if scanned_count % 10 == 0 {
-            let _ = app_handle.emit("scan-progress", ScanProgress { 
-                id: operation_id.clone(), 
-                count: scanned_count 
-            });
+            let _ = app_handle.emit(
+                "scan-progress",
+                ScanProgress {
+                    id: operation_id.clone(),
+                    count: scanned_count,
+                },
+            );
         }
     }
 

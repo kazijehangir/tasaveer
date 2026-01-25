@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -424,14 +424,14 @@ export function Clean() {
                                         </button>
                                     </div>
                                 ) : (
-                                        <button
-                                            onClick={handleScanMetadata}
-                                            disabled={!archivePath}
-                                            className="btn-primary px-4 py-2 flex items-center gap-2"
-                                        >
-                                            <Search className="w-4 h-4" />
-                                            Scan
-                                        </button>
+                                    <button
+                                        onClick={handleScanMetadata}
+                                        disabled={!archivePath}
+                                        className="btn-primary px-4 py-2 flex items-center gap-2"
+                                    >
+                                        <Search className="w-4 h-4" />
+                                        Scan
+                                    </button>
                                 )}
                             </div>
                         </div>
@@ -560,14 +560,14 @@ export function Clean() {
                                     </button>
                                 </div>
                             ) : (
-                                    <button
-                                        onClick={handleScanDuplicates}
-                                        disabled={!archivePath || !czkawkaStatus?.includes("found")}
-                                        className="btn-primary px-4 py-2 flex items-center gap-2"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                        Find Duplicates
-                                    </button>
+                                <button
+                                    onClick={handleScanDuplicates}
+                                    disabled={!archivePath || !czkawkaStatus?.includes("found")}
+                                    className="btn-primary px-4 py-2 flex items-center gap-2"
+                                >
+                                    <Search className="w-4 h-4" />
+                                    Find Duplicates
+                                </button>
                             )}
                         </div>
 
@@ -653,7 +653,7 @@ export function Clean() {
                                             </div>
                                         </div>
                                     ))}
-                </div>
+                                </div>
 
                                 {selectedForDelete.size > 0 && (
                                     <div className="mt-4 flex justify-end">
@@ -715,14 +715,14 @@ export function Clean() {
                                     </button>
                                 </div>
                             ) : (
-                                    <button
-                                        onClick={handleScanSimilar}
-                                        disabled={!archivePath || !czkawkaStatus?.includes("found")}
-                                        className="btn-primary px-4 py-2 flex items-center gap-2"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                        Find Similar
-                                    </button>
+                                <button
+                                    onClick={handleScanSimilar}
+                                    disabled={!archivePath || !czkawkaStatus?.includes("found")}
+                                    className="btn-primary px-4 py-2 flex items-center gap-2"
+                                >
+                                    <Search className="w-4 h-4" />
+                                    Find Similar
+                                </button>
                             )}
                         </div>
 

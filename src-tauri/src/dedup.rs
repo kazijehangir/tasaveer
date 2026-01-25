@@ -38,7 +38,7 @@ pub struct SimilarFile {
     pub size: u64,
     pub width: Option<u32>,
     pub height: Option<u32>,
-    pub similarity: u32,  // Similarity difference (0 = identical, higher = more different)
+    pub similarity: u32, // Similarity difference (0 = identical, higher = more different)
 }
 
 /// Result of a dedup scan
@@ -61,9 +61,7 @@ pub struct SimilarResult {
 pub fn check_czkawka() -> Result<String, String> {
     // Try custom path from settings first (would be passed in)
     // For now, just check PATH
-    let output = Command::new("czkawka_cli")
-        .arg("--version")
-        .output();
+    let output = Command::new("czkawka_cli").arg("--version").output();
 
     match output {
         Ok(out) if out.status.success() => {
@@ -74,7 +72,9 @@ pub fn check_czkawka() -> Result<String, String> {
             let stderr = String::from_utf8_lossy(&out.stderr);
             Err(format!("czkawka_cli failed: {}", stderr))
         }
-        Err(_) => Err("czkawka_cli not found in PATH. Please install it or download from GitHub.".to_string())
+        Err(_) => Err(
+            "czkawka_cli not found in PATH. Please install it or download from GitHub.".to_string(),
+        ),
     }
 }
 
@@ -93,46 +93,58 @@ pub async fn find_duplicates(
     czkawka_path: Option<String>,
     operation_id: String,
 ) -> Result<DedupResult, String> {
-    use tauri::{Emitter, Manager};
-    
+    use tauri::Emitter;
+
     let czkawka = czkawka_path.unwrap_or_else(|| "czkawka_cli".to_string());
-    
+
     // Create a temp file for JSON output
     let temp_dir = std::env::temp_dir();
     let output_file = temp_dir.join("tasaveer_dup_results.json");
     let output_path = output_file.to_string_lossy().to_string();
 
     // Emit indeterminate progress
-    let _ = app_handle.emit("dedup-progress", DedupProgress {
-        id: operation_id.clone(),
-        status: "Running czkawka scan...".to_string()
-    });
+    let _ = app_handle.emit(
+        "dedup-progress",
+        DedupProgress {
+            id: operation_id.clone(),
+            status: "Running czkawka scan...".to_string(),
+        },
+    );
 
     // Spawn process
-    let mut child = Command::new(&czkawka)
-        .args([
-            "dup",
-            "-d", &path,
-            "-C", &output_path,
-        ])
+    let child = Command::new(&czkawka)
+        .args(["dup", "-d", &path, "-C", &output_path])
         .spawn()
         .map_err(|e| format!("Failed to spawn czkawka: {}", e))?;
-        
+
     let pid = child.id();
-    
+
     // register process for cancellation
-    state.running_processes.lock().unwrap().insert(operation_id.clone(), pid);
-    
+    state
+        .running_processes
+        .lock()
+        .unwrap()
+        .insert(operation_id.clone(), pid);
+
     // Wait for output
-    let output = child.wait_with_output()
+    let _output = child
+        .wait_with_output()
         .map_err(|e| format!("Failed to wait for czkawka: {}", e))?;
-        
+
     // remove from running processes
-    state.running_processes.lock().unwrap().remove(&operation_id);
+    state
+        .running_processes
+        .lock()
+        .unwrap()
+        .remove(&operation_id);
 
     // Read and parse the JSON output (czkawka creates the file even with non-zero exit)
-    let json_content = std::fs::read_to_string(&output_file)
-        .map_err(|e| format!("czkawka did not produce output file. Is czkawka_cli installed? Error: {}", e))?;
+    let json_content = std::fs::read_to_string(&output_file).map_err(|e| {
+        format!(
+            "czkawka did not produce output file. Is czkawka_cli installed? Error: {}",
+            e
+        )
+    })?;
 
     parse_duplicate_json(&json_content)
 }
@@ -146,45 +158,57 @@ pub async fn find_similar_images(
     czkawka_path: Option<String>,
     operation_id: String,
 ) -> Result<SimilarResult, String> {
-    use tauri::{Emitter, Manager};
-    
+    use tauri::Emitter;
+
     let czkawka = czkawka_path.unwrap_or_else(|| "czkawka_cli".to_string());
-    
+
     let temp_dir = std::env::temp_dir();
     let output_file = temp_dir.join("tasaveer_similar_results.json");
     let output_path = output_file.to_string_lossy().to_string();
 
     // Emit indeterminate progress
-    let _ = app_handle.emit("similar-progress", DedupProgress {
-        id: operation_id.clone(),
-        status: "Scanning for similar images...".to_string()
-    });
+    let _ = app_handle.emit(
+        "similar-progress",
+        DedupProgress {
+            id: operation_id.clone(),
+            status: "Scanning for similar images...".to_string(),
+        },
+    );
 
-    let mut child = Command::new(&czkawka)
-        .args([
-            "image",
-            "-d", &path,
-            "-C", &output_path,
-        ])
+    let child = Command::new(&czkawka)
+        .args(["image", "-d", &path, "-C", &output_path])
         .spawn()
         .map_err(|e| format!("Failed to spawn czkawka: {}", e))?;
-        
-    let pid = child.id();
-    state.running_processes.lock().unwrap().insert(operation_id.clone(), pid);
-    
-    let output = child.wait_with_output()
-        .map_err(|e| format!("Failed to wait for czkawka: {}", e))?;
-        
-    state.running_processes.lock().unwrap().remove(&operation_id);
 
-    let json_content = std::fs::read_to_string(&output_file)
-        .map_err(|e| format!("czkawka did not produce output file. Is czkawka_cli installed? Error: {}", e))?;
+    let pid = child.id();
+    state
+        .running_processes
+        .lock()
+        .unwrap()
+        .insert(operation_id.clone(), pid);
+
+    let _output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to wait for czkawka: {}", e))?;
+
+    state
+        .running_processes
+        .lock()
+        .unwrap()
+        .remove(&operation_id);
+
+    let json_content = std::fs::read_to_string(&output_file).map_err(|e| {
+        format!(
+            "czkawka did not produce output file. Is czkawka_cli installed? Error: {}",
+            e
+        )
+    })?;
 
     parse_similar_json(&json_content)
 }
 
 /// Parse czkawka duplicate JSON output
-/// czkawka 10.0 outputs: {"24576":[[{"path":..., "size":..., "hash":...}, ...]]} 
+/// czkawka 10.0 outputs: {"24576":[[{"path":..., "size":..., "hash":...}, ...]]}
 /// Keyed by file size, value is array of groups, each group is array of files
 fn parse_duplicate_json(json: &str) -> Result<DedupResult, String> {
     if json.trim().is_empty() || json.trim() == "[]" || json.trim() == "{}" {
@@ -195,8 +219,8 @@ fn parse_duplicate_json(json: &str) -> Result<DedupResult, String> {
         });
     }
 
-    let parsed: serde_json::Value = serde_json::from_str(json)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
     let mut groups = Vec::new();
     let mut total_wasted = 0u64;
@@ -213,28 +237,32 @@ fn parse_duplicate_json(json: &str) -> Result<DedupResult, String> {
                         let mut group_size = 0u64;
 
                         for file in files_array {
-                            let path = file.get("path")
+                            let path = file
+                                .get("path")
                                 .and_then(|p| p.as_str())
                                 .unwrap_or("")
                                 .to_string();
-                            let size = file.get("size")
-                                .and_then(|s| s.as_u64())
-                                .unwrap_or(0);
-                            let modified = file.get("modified_date")
-                                .and_then(|m| m.as_i64())
-                                .map(|ts| {
-                                    // Convert Unix timestamp to readable date
-                                    chrono::DateTime::from_timestamp(ts, 0)
-                                        .map(|dt| dt.format("%Y-%m-%d").to_string())
-                                        .unwrap_or_else(|| ts.to_string())
-                                });
+                            let size = file.get("size").and_then(|s| s.as_u64()).unwrap_or(0);
+                            let modified =
+                                file.get("modified_date")
+                                    .and_then(|m| m.as_i64())
+                                    .map(|ts| {
+                                        // Convert Unix timestamp to readable date
+                                        chrono::DateTime::from_timestamp(ts, 0)
+                                            .map(|dt| dt.format("%Y-%m-%d").to_string())
+                                            .unwrap_or_else(|| ts.to_string())
+                                    });
 
                             if !files.is_empty() {
                                 total_wasted += size;
                             }
                             group_size = size;
 
-                            files.push(DuplicateFile { path, size, modified });
+                            files.push(DuplicateFile {
+                                path,
+                                size,
+                                modified,
+                            });
                         }
 
                         if files.len() > 1 {
@@ -266,8 +294,8 @@ fn parse_similar_json(json: &str) -> Result<SimilarResult, String> {
         });
     }
 
-    let parsed: serde_json::Value = serde_json::from_str(json)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
     let mut groups = Vec::new();
 
@@ -279,35 +307,41 @@ fn parse_similar_json(json: &str) -> Result<SimilarResult, String> {
                 let mut max_similarity = 0u32;
 
                 for file in files_array {
-                    let path = file.get("path")
+                    let path = file
+                        .get("path")
                         .and_then(|p| p.as_str())
                         .unwrap_or("")
                         .to_string();
-                    let size = file.get("size")
-                        .and_then(|s| s.as_u64())
-                        .unwrap_or(0);
-                    let width = file.get("width")
-                        .and_then(|w| w.as_u64())
-                        .map(|w| w as u32);
-                    let height = file.get("height")
+                    let size = file.get("size").and_then(|s| s.as_u64()).unwrap_or(0);
+                    let width = file.get("width").and_then(|w| w.as_u64()).map(|w| w as u32);
+                    let height = file
+                        .get("height")
                         .and_then(|h| h.as_u64())
                         .map(|h| h as u32);
-                    let similarity = file.get("similarity")
-                        .and_then(|s| s.as_u64())
-                        .unwrap_or(0) as u32;
+                    let similarity =
+                        file.get("similarity").and_then(|s| s.as_u64()).unwrap_or(0) as u32;
 
                     if similarity > max_similarity {
                         max_similarity = similarity;
                     }
 
-                    files.push(SimilarFile { path, size, width, height, similarity });
+                    files.push(SimilarFile {
+                        path,
+                        size,
+                        width,
+                        height,
+                        similarity,
+                    });
                 }
 
                 if files.len() > 1 {
                     // Convert similarity difference to percentage (lower diff = higher similarity)
                     // czkawka uses 0 = identical, higher = more different
                     let similarity_pct = 100.0 - (max_similarity as f32 / 10.0).min(100.0);
-                    groups.push(SimilarGroup { files, similarity: similarity_pct });
+                    groups.push(SimilarGroup {
+                        files,
+                        similarity: similarity_pct,
+                    });
                 }
             }
         }
