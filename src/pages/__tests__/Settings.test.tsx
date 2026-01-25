@@ -3,10 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Settings } from '../Settings';
-import { invoke } from '@tauri-apps/api/core';
+import { load } from '@tauri-apps/plugin-store';
 
-// Get the mocked functions from the global setup
-const mockInvoke = vi.mocked(invoke);
+// Get the mocked functions
+const mockLoad = vi.mocked(load);
 
 const renderSettings = () => {
     return render(
@@ -20,25 +20,23 @@ describe('Settings', () => {
     beforeEach(() => {
         vi.clearAllMocks();
 
-        // Configure mock implementations for settings tests
-        mockInvoke.mockImplementation((cmd: string) => {
-            switch (cmd) {
-                case 'load_settings':
-                    return Promise.resolve(JSON.stringify({
-                        archivePath: '/test/archive',
-                        immichUrl: 'http://localhost:2283',
-                        immichApiKey: 'test-api-key',
-                        phockupPath: '',
-                        immichGoPath: '',
-                    }));
-                case 'save_settings':
-                    return Promise.resolve(undefined);
-                case 'validate_immich':
-                    return Promise.resolve('Connected successfully!');
-                default:
-                    return Promise.resolve(undefined);
-            }
-        });
+        // Configure mock store with test data
+        const mockStore = {
+            get: vi.fn((key: string) => {
+                const data: Record<string, string> = {
+                    archivePath: '/test/archive',
+                    immichUrl: 'http://localhost:2283',
+                    immichApiKey: 'test-api-key',
+                    phockupPath: '',
+                    immichGoPath: '',
+                };
+                return Promise.resolve(data[key]);
+            }),
+            set: vi.fn(() => Promise.resolve()),
+            save: vi.fn(() => Promise.resolve()),
+        };
+
+        mockLoad.mockResolvedValue(mockStore as unknown as Awaited<ReturnType<typeof load>>);
     });
 
     describe('Rendering', () => {
@@ -77,11 +75,11 @@ describe('Settings', () => {
     });
 
     describe('Form Interactions', () => {
-        it('calls invoke with load_settings on mount', async () => {
+        it('initializes store on mount', async () => {
             renderSettings();
 
             await waitFor(() => {
-                expect(mockInvoke).toHaveBeenCalledWith('load_settings');
+                expect(mockLoad).toHaveBeenCalledWith('settings.json');
             });
         });
 
@@ -109,33 +107,38 @@ describe('Settings', () => {
             expect(saveButton).toBeInTheDocument();
         });
 
-        it('calls save_settings when save button is clicked', async () => {
+        it('calls store.save when save button is clicked', async () => {
+            const mockStore = {
+                get: vi.fn(() => Promise.resolve('')),
+                set: vi.fn(() => Promise.resolve()),
+                save: vi.fn(() => Promise.resolve()),
+            };
+            mockLoad.mockResolvedValue(mockStore as unknown as Awaited<ReturnType<typeof load>>);
+
             const user = userEvent.setup();
             renderSettings();
 
             await waitFor(() => {
-                expect(screen.getByDisplayValue('/test/archive')).toBeInTheDocument();
+                expect(mockLoad).toHaveBeenCalled();
             });
 
             const saveButton = screen.getByRole('button', { name: /save/i });
             await user.click(saveButton);
 
             await waitFor(() => {
-                expect(mockInvoke).toHaveBeenCalledWith('save_settings', expect.any(Object));
+                expect(mockStore.save).toHaveBeenCalled();
             });
         });
     });
 
     describe('Edge Cases', () => {
         it('handles empty settings gracefully', async () => {
-            mockInvoke.mockImplementation((cmd: string) => {
-                switch (cmd) {
-                    case 'load_settings':
-                        return Promise.resolve('{}');
-                    default:
-                        return Promise.resolve(undefined);
-                }
-            });
+            const mockStore = {
+                get: vi.fn(() => Promise.resolve(undefined)),
+                set: vi.fn(() => Promise.resolve()),
+                save: vi.fn(() => Promise.resolve()),
+            };
+            mockLoad.mockResolvedValue(mockStore as unknown as Awaited<ReturnType<typeof load>>);
 
             renderSettings();
 

@@ -1,9 +1,10 @@
 import { FolderOpen, Server, Key, Package, XCircle, CheckCircle2, Save, RefreshCw, AlertTriangle, ExternalLink } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Command } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { load, type Store } from "@tauri-apps/plugin-store";
 
 interface SettingsData {
   archivePath: string;
@@ -39,22 +40,38 @@ export function Settings() {
   });
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const storeRef = useRef<Store | null>(null);
 
   useEffect(() => {
-    loadSettings();
+    initStore();
     checkPrerequisites();
   }, []);
 
-  const loadSettings = async () => {
+  const initStore = async () => {
     try {
-      const savedSettingsStr = await invoke<string>("load_settings");
-      if (savedSettingsStr && savedSettingsStr !== "{}") {
-        try {
-          const parsed = JSON.parse(savedSettingsStr);
-          setSettings(prev => ({ ...prev, ...parsed }));
-        } catch (parseErr) {
-          console.error("Failed to parse settings:", parseErr);
+      // Load store with auto-save enabled (default behavior)
+      const store = await load('settings.json');
+      storeRef.current = store;
+      await loadSettings();
+    } catch (err) {
+      console.error('Failed to initialize settings store:', err);
+    }
+  };
+
+  const loadSettings = async () => {
+    const store = storeRef.current;
+    if (!store) return;
+
+    try {
+      const loaded: Partial<SettingsData> = {};
+      for (const key of Object.keys(settings) as (keyof SettingsData)[]) {
+        const value = await store.get<string>(key);
+        if (value !== undefined && value !== null) {
+          loaded[key] = value;
         }
+      }
+      if (Object.keys(loaded).length > 0) {
+        setSettings(prev => ({ ...prev, ...loaded }));
       }
     } catch (err) {
       console.error("Failed to load settings:", err);
@@ -175,10 +192,20 @@ export function Settings() {
   };
 
   const handleSave = async () => {
+    const store = storeRef.current;
+    if (!store) {
+      setSaveMessage({ type: 'error', text: "Settings store not initialized." });
+      return;
+    }
+
     setSaving(true);
     setSaveMessage(null);
     try {
-      await invoke("save_settings", { settings: JSON.stringify(settings, null, 2) });
+      // Save each setting as individual key
+      for (const [key, value] of Object.entries(settings)) {
+        await store.set(key, value);
+      }
+      await store.save(); // Force immediate save
       setSaveMessage({ type: 'success', text: "Settings saved successfully!" });
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (err) {

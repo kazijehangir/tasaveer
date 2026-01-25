@@ -1,9 +1,7 @@
 use std::fs;
-use std::io::Write;
-use tauri::Manager;
 
-mod metadata;
 mod dedup;
+mod metadata;
 mod state; // Add state module
 
 use state::AppState; // Import AppState
@@ -17,38 +15,6 @@ fn greet(name: &str) -> String {
 #[tauri::command]
 fn cancel_operation(state: tauri::State<AppState>, operation_id: String) {
     state.cancel(&operation_id);
-}
-
-#[tauri::command]
-fn load_settings(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let data_dir = app_handle.path().app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    
-    // Create the directory if it doesn't exist
-    fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create data dir: {}", e))?;
-    
-    let settings_path = data_dir.join("settings.json");
-    
-    match fs::read_to_string(&settings_path) {
-        Ok(content) => Ok(content),
-        Err(_) => Ok("{}".to_string()), // Return empty JSON if file doesn't exist
-    }
-}
-
-#[tauri::command]
-fn save_settings(app_handle: tauri::AppHandle, settings: String) -> Result<(), String> {
-    let data_dir = app_handle.path().app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    
-    // Create the directory if it doesn't exist
-    fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create data dir: {}", e))?;
-    
-    let settings_path = data_dir.join("settings.json");
-    
-    let mut file = fs::File::create(&settings_path).map_err(|e| e.to_string())?;
-    file.write_all(settings.as_bytes())
-        .map_err(|e| e.to_string())?;
-    Ok(())
 }
 
 #[tauri::command]
@@ -83,18 +49,19 @@ fn copy_to_staging(source: String, staging: String) -> Result<String, String> {
     // Use rsync -a (archive mode) to preserve attributes and recursiveness
     // source/ -> copies contents of source to staging (if trailing slash)
     // source  -> copies source directory into staging (if no trailing slash)
-    // We want to copy contents into a subdirectory in staging or directly? 
+    // We want to copy contents into a subdirectory in staging or directly?
     // Let's copy source folder INTO staging to keep them separated if multiple sources.
-    
+
     // Get source folder name to create specific subdir in staging
     let source_path = std::path::Path::new(&source);
-    let dir_name = source_path.file_name()
+    let dir_name = source_path
+        .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("source");
-        
+
     let final_dest = std::path::Path::new(&staging).join(dir_name);
     let final_dest_str = final_dest.to_string_lossy().to_string();
-    
+
     // Ensure parent dir exists
     if let Some(parent) = final_dest.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -102,9 +69,9 @@ fn copy_to_staging(source: String, staging: String) -> Result<String, String> {
 
     let output = std::process::Command::new("rsync")
         .args([
-            "-a",          // archive mode (recursive, preserve attrs)
-            &source,       // source
-            &staging       // destination (rsync will create dir_name inside staging)
+            "-a",     // archive mode (recursive, preserve attrs)
+            &source,  // source
+            &staging, // destination (rsync will create dir_name inside staging)
         ])
         .output()
         .map_err(|e| format!("Failed to execute rsync: {}", e))?;
@@ -201,15 +168,14 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(AppState::new()) // Initialize AppState
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
-            load_settings,
-            save_settings,
-            cancel_operation, // Add cancel command
+            cancel_operation,
             find_zips,
             copy_to_staging,
             clean_staging,

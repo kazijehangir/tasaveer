@@ -60,6 +60,34 @@ vi.mock('@tauri-apps/plugin-shell', () => {
     };
 });
 
+// Mock Tauri store plugin
+vi.mock('@tauri-apps/plugin-store', () => {
+    // In-memory store for testing
+    let storeData: Record<string, unknown> = {};
+
+    const mockStore = {
+        get: vi.fn((key: string) => Promise.resolve(storeData[key])),
+        set: vi.fn((key: string, value: unknown) => {
+            storeData[key] = value;
+            return Promise.resolve();
+        }),
+        save: vi.fn(() => Promise.resolve()),
+        delete: vi.fn((key: string) => {
+            delete storeData[key];
+            return Promise.resolve();
+        }),
+        clear: vi.fn(() => {
+            storeData = {};
+            return Promise.resolve();
+        }),
+    };
+
+    return {
+        load: vi.fn(() => Promise.resolve(mockStore)),
+        Store: vi.fn(() => mockStore),
+    };
+});
+
 // Mock Tauri opener plugin
 vi.mock('@tauri-apps/plugin-opener', () => ({
     openUrl: vi.fn(() => Promise.resolve()),
