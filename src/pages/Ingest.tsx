@@ -556,21 +556,21 @@ export function Ingest() {
             <div className="grid grid-cols-3 gap-3 mb-6">
               <button
                 onClick={() => { setIngestType('local'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'local' ? 'bg-primary-50 dark:bg-purple-500/20 border-primary-500 text-primary-600 dark:text-purple-200' : 'bg-surface-secondary border-border text-text-muted hover:border-text-muted'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'local' ? 'bg-primary-100 dark:bg-purple-500/20 border-primary-500 text-primary-800 dark:text-purple-200' : 'bg-surface-secondary border-border text-text-main hover:border-text-muted'}`}
               >
                 <HardDrive className="w-5 h-5" />
                 <span className="text-xs font-semibold">Local</span>
               </button>
               <button
                 onClick={() => { setIngestType('google-photos'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'google-photos' ? 'bg-primary-50 dark:bg-blue-500/20 border-primary-500 text-primary-600 dark:text-blue-200' : 'bg-surface-secondary border-border text-text-muted hover:border-text-muted'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'google-photos' ? 'bg-primary-100 dark:bg-blue-500/20 border-primary-500 text-primary-800 dark:text-blue-200' : 'bg-surface-secondary border-border text-text-main hover:border-text-muted'}`}
               >
                 <Image className="w-5 h-5" />
                 <span className="text-xs font-semibold">Google</span>
               </button>
               <button
                 onClick={() => { setIngestType('icloud'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'icloud' ? 'bg-primary-50 dark:bg-blue-500/20 border-primary-500 text-primary-600 dark:text-blue-200' : 'bg-surface-secondary border-border text-text-muted hover:border-text-muted'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'icloud' ? 'bg-primary-100 dark:bg-blue-500/20 border-primary-500 text-primary-800 dark:text-blue-200' : 'bg-surface-secondary border-border text-text-main hover:border-text-muted'}`}
               >
                 <Cloud className="w-5 h-5" />
                 <span className="text-xs font-semibold">iCloud</span>
@@ -615,7 +615,7 @@ export function Ingest() {
                 <button
                   onClick={scanSource}
                   disabled={isProcessing}
-                  className="px-4 py-2 bg-primary-50 dark:bg-purple-500/20 text-primary-600 dark:text-purple-300 rounded-lg hover:bg-primary-100 dark:hover:bg-purple-500/30 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-primary-100 dark:bg-purple-500/20 text-primary-700 dark:text-purple-300 rounded-lg hover:bg-primary-200 dark:hover:bg-purple-500/30 transition-colors flex items-center gap-2"
                 >
                   {status === 'scanning' ? <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" /> : <Search className="w-4 h-4" />}
                   Scan for Tags
@@ -768,14 +768,14 @@ export function Ingest() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setSelectedStrategy('copy')}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${selectedStrategy === 'copy' ? 'bg-primary-50 dark:bg-purple-500/20 border-primary-500 text-primary-600 dark:text-purple-200' : 'bg-white dark:bg-black/20 border-border text-text-muted hover:border-text-muted'}`}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${selectedStrategy === 'copy' ? 'bg-primary-100 dark:bg-purple-500/20 border-primary-500 text-primary-800 dark:text-purple-200' : 'bg-white dark:bg-black/20 border-border text-text-main hover:border-text-muted'}`}
                 >
                   <Copy className="w-4 h-4" />
                   <span className="text-sm font-semibold">Copy</span>
                 </button>
                 <button
                   onClick={() => setSelectedStrategy('move')}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${selectedStrategy === 'move' ? 'bg-primary-50 dark:bg-purple-500/20 border-primary-500 text-primary-600 dark:text-purple-200' : 'bg-white dark:bg-black/20 border-border text-text-muted hover:border-text-muted'}`}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${selectedStrategy === 'move' ? 'bg-primary-100 dark:bg-purple-500/20 border-primary-500 text-primary-800 dark:text-purple-200' : 'bg-white dark:bg-black/20 border-border text-text-main hover:border-text-muted'}`}
                 >
                   <Move className="w-4 h-4" />
                   <span className="text-sm font-semibold">Move</span>

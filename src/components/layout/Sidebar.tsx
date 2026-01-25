@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                                         onClick={() => onTabChange(item.id)}
                                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-sm font-medium relative
                       ${isActive
-                                                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                                                ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
                                                 : 'text-text-muted hover:text-text-main hover:bg-surface-hover'
                                             }`}
                                     >
