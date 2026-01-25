@@ -80,7 +80,7 @@ export function Sync() {
       <div className="glass-card p-8">
         <h2 className="text-2xl font-bold mb-6 text-text-main">Sync Options</h2>
         <div className="space-y-4">
-          <label className="flex items-center gap-4 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer group border border-transparent hover:border-border">
+          <label className="flex items-center gap-4 p-4 rounded-xl bg-surface-secondary hover:bg-surface-hover transition-colors cursor-pointer group border border-transparent hover:border-border">
             <input
               type="checkbox"
               checked={syncAll}
@@ -97,7 +97,7 @@ export function Sync() {
             </div>
           </label>
 
-          <label className="flex items-center gap-4 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 opacity-50 cursor-not-allowed border border-transparent">
+          <label className="flex items-center gap-4 p-4 rounded-xl bg-surface-secondary opacity-50 cursor-not-allowed border border-transparent">
             <input
               type="checkbox"
               disabled
@@ -113,7 +113,7 @@ export function Sync() {
             </div>
           </label>
 
-          <label className="flex items-center gap-4 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 opacity-50 cursor-not-allowed border border-transparent">
+          <label className="flex items-center gap-4 p-4 rounded-xl bg-surface-secondary opacity-50 cursor-not-allowed border border-transparent">
             <input
               type="checkbox"
               disabled

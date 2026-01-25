@@ -35,10 +35,20 @@ export default {
           DEFAULT: 'var(--color-accent-500)',
         },
         background: 'var(--color-background)',
-        surface: 'var(--color-surface)',
+        surface: {
+          DEFAULT: 'var(--color-surface)',
+          secondary: 'var(--color-surface-secondary)',
+          elevated: 'var(--color-surface-elevated)',
+          hover: 'var(--color-surface-hover)',
+        },
         text: {
           main: 'var(--color-text-main)',
           muted: 'var(--color-text-muted)',
+          tertiary: 'var(--color-text-tertiary)',
+        },
+        border: {
+          DEFAULT: 'var(--color-border)',
+          hover: 'var(--color-border-hover)',
         },
       },
       fontFamily: {

@@ -1,4 +1,4 @@
-import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, ChevronDown, ChevronUp, XCircle, Image, Cloud, Archive, Camera, FolderTree, Tag, Plus, Search } from "lucide-react";
+import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, Image, Cloud, Archive, Camera, FolderTree, Tag, Plus, Search } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -61,7 +61,7 @@ export function Ingest() {
   const [selectedStrategy, setSelectedStrategy] = useState<'copy' | 'move'>('copy');
   const [sourcePath, setSourcePath] = useState<string | null>(null);
   const [destPath, setDestPath] = useState<string | null>(null);
-  const [defaultArchivePath, setDefaultArchivePath] = useState<string | null>(null);
+
 
   const [status, setStatus] = useState<'idle' | 'scanning' | 'copying' | 'tagging' | 'organizing' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
@@ -187,7 +187,6 @@ export function Ingest() {
         const store = await load('settings.json');
         const archivePathValue = await store.get<string>('archivePath');
         if (archivePathValue) {
-          setDefaultArchivePath(archivePathValue);
           setDestPath(archivePathValue);
         }
         const savedTags = await store.get<SourceTag[]>('sourceTags');
@@ -612,28 +611,28 @@ export function Ingest() {
           {/* Source Selection */}
           <div className="glass-card p-8">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-text-main">
-              <span className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-text-main">1</span>
+              <span className="w-8 h-8 rounded-full bg-surface-secondary flex items-center justify-center text-sm font-bold text-text-main">1</span>
               Source Type
             </h2>
 
             <div className="grid grid-cols-3 gap-3 mb-6">
               <button
                 onClick={() => { setIngestType('local'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'local' ? 'bg-primary-50 dark:bg-purple-500/20 border-primary-500 text-primary-600 dark:text-purple-200' : 'bg-neutral-50 dark:bg-slate-800/30 border-border text-text-muted hover:border-text-muted'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'local' ? 'bg-primary-50 dark:bg-purple-500/20 border-primary-500 text-primary-600 dark:text-purple-200' : 'bg-surface-secondary border-border text-text-muted hover:border-text-muted'}`}
               >
                 <HardDrive className="w-5 h-5" />
                 <span className="text-xs font-semibold">Local</span>
               </button>
               <button
                 onClick={() => { setIngestType('google-photos'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'google-photos' ? 'bg-primary-50 dark:bg-blue-500/20 border-primary-500 text-primary-600 dark:text-blue-200' : 'bg-neutral-50 dark:bg-slate-800/30 border-border text-text-muted hover:border-text-muted'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'google-photos' ? 'bg-primary-50 dark:bg-blue-500/20 border-primary-500 text-primary-600 dark:text-blue-200' : 'bg-surface-secondary border-border text-text-muted hover:border-text-muted'}`}
               >
                 <Image className="w-5 h-5" />
                 <span className="text-xs font-semibold">Google</span>
               </button>
               <button
                 onClick={() => { setIngestType('icloud'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'icloud' ? 'bg-primary-50 dark:bg-blue-500/20 border-primary-500 text-primary-600 dark:text-blue-200' : 'bg-neutral-50 dark:bg-slate-800/30 border-border text-text-muted hover:border-text-muted'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'icloud' ? 'bg-primary-50 dark:bg-blue-500/20 border-primary-500 text-primary-600 dark:text-blue-200' : 'bg-surface-secondary border-border text-text-muted hover:border-text-muted'}`}
               >
                 <Cloud className="w-5 h-5" />
                 <span className="text-xs font-semibold">iCloud</span>
@@ -642,7 +641,7 @@ export function Ingest() {
 
             {!sourcePath ? (
               <div className="grid grid-cols-1 gap-4">
-                <button onClick={handleSelectSource} className="group flex items-center gap-4 p-6 rounded-xl bg-neutral-50 dark:bg-slate-800/50 border border-border hover:border-primary-500 transition-all hover:scale-[1.02]">
+                <button onClick={handleSelectSource} className="group flex items-center gap-4 p-6 rounded-xl bg-surface-secondary border border-border hover:border-primary-500 transition-all hover:scale-[1.02]">
                   <div className="p-3 rounded-lg bg-primary-100 dark:bg-purple-500/20 group-hover:bg-primary-200 dark:group-hover:bg-purple-500/30 transition-colors">
                     {ingestType === 'local' ? <FolderOpen className="w-6 h-6 text-primary-600 dark:text-purple-400" /> : <Archive className="w-6 h-6 text-primary-600 dark:text-purple-400" />}
                   </div>
@@ -657,7 +656,7 @@ export function Ingest() {
                 </button>
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-neutral-50 dark:bg-slate-800/50 border border-green-500/30 flex items-center justify-between">
+              <div className="p-4 rounded-xl bg-surface-secondary border border-green-500/30 flex items-center justify-between">
                 <div className="flex items-center gap-3 overflow-hidden">
                   <div className="p-2 rounded-lg bg-green-500/20 text-green-600 dark:text-green-400">
                     <CheckCircle2 className="w-5 h-5" />
@@ -692,7 +691,7 @@ export function Ingest() {
           <div className={`glass-card p-8 transition-opacity ${!enableTagging ? 'opacity-50 grayscale' : ''}`}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold flex items-center gap-2 text-text-main">
-                <span className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-text-main">2</span>
+                <span className="w-8 h-8 rounded-full bg-surface-secondary flex items-center justify-center text-sm font-bold text-text-main">2</span>
                 Assign Tags
               </h2>
               <label className="flex items-center gap-3 cursor-pointer">
@@ -747,7 +746,7 @@ export function Ingest() {
                     </h3>
                     <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
                       {cameraModels.map((group) => (
-                        <div key={group.model} className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-slate-800/50 text-sm">
+                        <div key={group.model} className="flex items-center justify-between p-2 rounded-lg bg-surface-secondary text-sm">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-text-main">{group.model}</span>
                             <span className="text-xs text-text-muted">({group.count} files)</span>
@@ -776,7 +775,7 @@ export function Ingest() {
                     </h3>
                     <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
                       {directoryGroups.map((group) => (
-                        <div key={group.directory} className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-slate-800/50 text-sm">
+                        <div key={group.directory} className="flex items-center justify-between p-2 rounded-lg bg-surface-secondary text-sm">
                           <div className="flex items-center gap-2 overflow-hidden">
                             <span className="font-medium text-text-main truncate max-w-[150px]" title={group.directory}>{group.directory}</span>
                             <span className="text-xs text-text-muted">({group.count})</span>
@@ -813,7 +812,7 @@ export function Ingest() {
             </div>
 
             {/* Destination Selector */}
-            <div className="mb-6 p-4 rounded-xl bg-neutral-50 dark:bg-slate-800/50 border border-border">
+            <div className="mb-6 p-4 rounded-xl bg-surface-secondary border border-border">
               <h3 className="text-sm font-semibold text-text-muted mb-2">Archive Destination</h3>
               <div className="flex gap-2">
                 <div className="flex-1 truncate text-sm font-mono text-text-main bg-white dark:bg-black/20 p-2 rounded border border-border">
@@ -823,6 +822,30 @@ export function Ingest() {
                   ...
                 </button>
               </div>
+            </div>
+
+            {/* Copy/Move Strategy Selector */}
+            <div className="mb-6 p-4 rounded-xl bg-surface-secondary border border-border">
+              <h3 className="text-sm font-semibold text-text-muted mb-2">Import Strategy</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setSelectedStrategy('copy')}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${selectedStrategy === 'copy' ? 'bg-primary-50 dark:bg-purple-500/20 border-primary-500 text-primary-600 dark:text-purple-200' : 'bg-white dark:bg-black/20 border-border text-text-muted hover:border-text-muted'}`}
+                >
+                  <Copy className="w-4 h-4" />
+                  <span className="text-sm font-semibold">Copy</span>
+                </button>
+                <button
+                  onClick={() => setSelectedStrategy('move')}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${selectedStrategy === 'move' ? 'bg-primary-50 dark:bg-purple-500/20 border-primary-500 text-primary-600 dark:text-purple-200' : 'bg-white dark:bg-black/20 border-border text-text-muted hover:border-text-muted'}`}
+                >
+                  <Move className="w-4 h-4" />
+                  <span className="text-sm font-semibold">Move</span>
+                </button>
+              </div>
+              <p className="text-xs text-text-muted mt-2">
+                {selectedStrategy === 'copy' ? 'Original files will be preserved in source location.' : 'Original files will be deleted after import.'}
+              </p>
             </div>
 
             {/* Main Action Button */}
@@ -852,11 +875,11 @@ export function Ingest() {
             <div className="space-y-4">
               {/* Steps Visualizer */}
               <div className="relative pt-4 pb-8">
-                <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-neutral-200 dark:bg-slate-700" />
+                <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-surface-secondary" />
 
                 {/* Step 1 */}
                 <div className="relative flex items-center gap-4 mb-6">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['scanning'].includes(status) || isProcessing ? 'bg-primary-500 text-white' : 'bg-neutral-200 dark:bg-slate-700 text-text-muted'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['scanning'].includes(status) || isProcessing ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-muted'}`}>
                     1
                   </div>
                   <div>
@@ -867,7 +890,7 @@ export function Ingest() {
 
                 {/* Step 2 */}
                 <div className="relative flex items-center gap-4 mb-6">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['copying', 'tagging'].includes(status) ? 'bg-primary-500 text-white' : 'bg-neutral-200 dark:bg-slate-700 text-text-muted'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['copying', 'tagging'].includes(status) ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-muted'}`}>
                     2
                   </div>
                   <div>
@@ -879,7 +902,7 @@ export function Ingest() {
 
                 {/* Step 3 */}
                 <div className="relative flex items-center gap-4">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['organizing'].includes(status) ? 'bg-primary-500 text-white' : 'bg-neutral-200 dark:bg-slate-700 text-text-muted'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['organizing'].includes(status) ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-muted'}`}>
                     3
                   </div>
                   <div>

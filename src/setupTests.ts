@@ -1,6 +1,21 @@
 import '@testing-library/jest-dom/vitest';
 import { vi, beforeAll, afterAll } from 'vitest';
 
+// Mock window.matchMedia for theme detection in Sidebar
+Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-color-scheme: dark)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    })),
+});
+
 // Mock Tauri core API
 vi.mock('@tauri-apps/api/core', () => ({
     invoke: vi.fn((cmd: string, args?: unknown) => {

@@ -244,7 +244,7 @@ export function Settings() {
         <h2 className="text-3xl font-bold mb-2">
           Settings
         </h2>
-        <p className="text-slate-400">
+        <p className="text-text-muted">
           Configure external tools and connections
         </p>
       </div>
@@ -261,7 +261,7 @@ export function Settings() {
           <button
             onClick={checkPrerequisites}
             disabled={validation.checking}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+            className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-text-main transition-colors"
             title="Recheck dependencies"
           >
             <RefreshCw className={`w-5 h-5 ${validation.checking ? 'animate-spin' : ''}`} />
@@ -270,7 +270,7 @@ export function Settings() {
 
         <div className="space-y-4">
           {/* Phockup Status */}
-          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-yellow-500/20">
                 <Package className="w-5 h-5 text-yellow-400" />
@@ -286,12 +286,12 @@ export function Settings() {
                     GitHub
                   </button>
                 </div>
-                <p className="text-sm text-slate-400">Media organization tool (requires manual install)</p>
+                <p className="text-sm text-text-muted">Media organization tool (requires manual install)</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               {validation.checking ? (
-                <span className="text-slate-500 text-sm">Checking...</span>
+                <span className="text-text-muted text-sm">Checking...</span>
               ) : validation.phockup ? (
                 <>
                   <CheckCircle2 className="w-5 h-5 text-green-500" />
@@ -309,7 +309,7 @@ export function Settings() {
           </div>
 
           {/* Immich-Go Status */}
-          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg ${validation.immichGoSource === 'bundled' ? 'bg-green-500/20' : 'bg-yellow-500/20'}`}>
                 <Package className={`w-5 h-5 ${validation.immichGoSource === 'bundled' ? 'text-green-400' : 'text-yellow-400'}`} />
@@ -325,7 +325,7 @@ export function Settings() {
                     GitHub
                   </button>
                 </div>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-text-muted">
                   {validation.immichGoSource === 'bundled'
                     ? 'Bundled with app (ready to use)'
                     : 'Immich upload utility'}
@@ -334,7 +334,7 @@ export function Settings() {
             </div>
             <div className="flex items-center gap-2">
               {validation.checking ? (
-                <span className="text-slate-500 text-sm">Checking...</span>
+                <span className="text-text-muted text-sm">Checking...</span>
               ) : validation.immichGo ? (
                 <>
                   <CheckCircle2 className="w-5 h-5 text-green-500" />
@@ -378,10 +378,10 @@ export function Settings() {
 
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">
+            <label className="block text-sm font-medium text-text-muted">
               Canonical Archive Path
             </label>
-            <p className="text-xs text-slate-500 mb-2">
+            <p className="text-xs text-text-tertiary mb-2">
               The master folder where your organized media will be stored
             </p>
             <div className="flex gap-3">
@@ -414,7 +414,7 @@ export function Settings() {
 
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">
+            <label className="block text-sm font-medium text-text-muted">
               Server URL
             </label>
             <input
@@ -427,7 +427,7 @@ export function Settings() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">
+            <label className="block text-sm font-medium text-text-muted">
               API Key
             </label>
             <div className="relative">
@@ -471,17 +471,17 @@ export function Settings() {
           </div>
           <div>
             <h2 className="text-2xl font-bold">Advanced: Custom Binary Paths</h2>
-            <p className="text-sm text-slate-400">Override bundled or PATH binaries with your own</p>
+            <p className="text-sm text-text-muted">Override bundled or PATH binaries with your own</p>
           </div>
         </div>
 
         <div className="space-y-6">
           {/* Phockup Path Override */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">
+            <label className="block text-sm font-medium text-text-muted">
               Phockup Binary Path
             </label>
-            <p className="text-xs text-slate-500 mb-2">
+            <p className="text-xs text-text-tertiary mb-2">
               Leave empty to use system PATH. Set path to a custom phockup installation.
             </p>
             <div className="flex gap-3">
@@ -528,10 +528,10 @@ export function Settings() {
 
           {/* Immich-Go Path Override */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">
+            <label className="block text-sm font-medium text-text-muted">
               Immich-Go Binary Path
             </label>
-            <p className="text-xs text-slate-500 mb-2">
+            <p className="text-xs text-text-tertiary mb-2">
               Leave empty to use bundled version. Set path to override with custom installation.
             </p>
             <div className="flex gap-3">
@@ -576,9 +576,9 @@ export function Settings() {
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/50">
-            <p className="text-xs text-slate-400">
-              <strong className="text-slate-300">Note:</strong> After changing paths, click "Recheck" in the System Prerequisites section above to validate the binaries.
+          <div className="p-4 rounded-xl bg-surface-secondary border border-border">
+            <p className="text-xs text-text-muted">
+              <strong className="text-text-main">Note:</strong> After changing paths, click "Recheck" in the System Prerequisites section above to validate the binaries.
             </p>
           </div>
         </div>
