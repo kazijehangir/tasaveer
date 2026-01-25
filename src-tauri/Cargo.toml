@@ -32,6 +32,7 @@ walkdir = "2"
 tauri-plugin-fs = "2.4.4"
 exiftool = "0.3.0"
 tauri-plugin-store = "2.4.2"
+which = "8.0.0"
 
 [dev-dependencies]
 tempfile = "3"

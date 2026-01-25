@@ -1,5 +1,7 @@
 use std::fs;
 
+pub mod binaries;
+
 mod dedup;
 mod exiftool_daemon;
 mod metadata;
