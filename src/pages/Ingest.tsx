@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { Command, Child } from "@tauri-apps/plugin-shell";
+import { load } from "@tauri-apps/plugin-store";
 
 // Types for source tagging
 interface SourceTag {
@@ -183,16 +184,15 @@ export function Ingest() {
   useEffect(() => {
     async function loadData() {
       try {
-        const settingsStr = await invoke<string>("load_settings");
-        if (settingsStr) {
-          const settings = JSON.parse(settingsStr);
-          if (settings.archivePath) {
-            setDefaultArchivePath(settings.archivePath);
-            setDestPath(settings.archivePath);
-          }
-          if (settings.sourceTags) {
-            setSourceTags(settings.sourceTags);
-          }
+        const store = await load('settings.json');
+        const archivePathValue = await store.get<string>('archivePath');
+        if (archivePathValue) {
+          setDefaultArchivePath(archivePathValue);
+          setDestPath(archivePathValue);
+        }
+        const savedTags = await store.get<SourceTag[]>('sourceTags');
+        if (savedTags) {
+          setSourceTags(savedTags);
         }
       } catch (err) {
         console.error("Failed to load settings:", err);
@@ -203,10 +203,9 @@ export function Ingest() {
 
   const saveTags = async (tags: SourceTag[]) => {
     try {
-      const settingsStr = await invoke<string>("load_settings");
-      const settings = settingsStr ? JSON.parse(settingsStr) : {};
-      settings.sourceTags = tags;
-      await invoke("save_settings", { settings: JSON.stringify(settings) });
+      const store = await load('settings.json');
+      await store.set('sourceTags', tags);
+      await store.save();
     } catch (err) {
       console.error("Failed to save tags:", err);
     }
@@ -222,6 +221,7 @@ export function Ingest() {
       addToLogs(`Scanning source path: ${sourcePath}`);
       const results = await invoke<FileMetadataInfo[]>("scan_missing_dates", {
         path: sourcePath,
+        operationId: "scan_source",
       });
 
 
@@ -413,163 +413,164 @@ export function Ingest() {
             await spawnAndTrack(command, resolve, reject);
           });
         } else {
-        // 1. Copy to Staging
+          // 1. Copy to Staging
 
-        // 1. Copy to Staging
-        setStatus('copying');
-        const stagingPath = `${destPath}/staging`; // Or custom logic
-        addToLogs(`Copying files to staging: ${stagingPath}...`);
+          // 1. Copy to Staging
+          setStatus('copying');
+          const stagingPath = `${destPath}/staging`; // Or custom logic
+          addToLogs(`Copying files to staging: ${stagingPath}...`);
 
-        await invoke('copy_to_staging', { source: sourcePath, staging: stagingPath });
-        addToLogs('Copy completed.');
+          await invoke('copy_to_staging', { source: sourcePath, staging: stagingPath });
+          addToLogs('Copy completed.');
 
-        // 2. Tag Files in Staging
-        setStatus('tagging');
-        addToLogs('Applying tags to staged files...');
+          // 2. Tag Files in Staging
+          setStatus('tagging');
+          addToLogs('Applying tags to staged files...');
 
-        // Use the scannedFiles state but re-map paths to staging?
-        // Actually, we can just run apply logic based on the TAGS we have.
-        // We need to find files in STAGING that match our tags.
-        // Option: Rescan staging to get exact file paths.
-        addToLogs('Scanning staging directory to apply tags...');
-        const stagedFiles = await invoke<FileMetadataInfo[]>("scan_missing_dates", {
-          path: stagingPath,
-        });
+          // Use the scannedFiles state but re-map paths to staging?
+          // Actually, we can just run apply logic based on the TAGS we have.
+          // We need to find files in STAGING that match our tags.
+          // Option: Rescan staging to get exact file paths.
+          addToLogs('Scanning staging directory to apply tags...');
+          const stagedFiles = await invoke<FileMetadataInfo[]>("scan_missing_dates", {
+            path: stagingPath,
+            operationId: "scan_staging",
+          });
 
-        let taggedCount = 0;
-        for (const file of stagedFiles) {
-          if (cancelledRef.current) throw new Error("Cancelled");
+          let taggedCount = 0;
+          for (const file of stagedFiles) {
+            if (cancelledRef.current) throw new Error("Cancelled");
 
-          // Match logic
-          const model = file.camera_model || "Unknown";
-          let tag = sourceTags.find((t) => t.cameraAliases.includes(model));
+            // Match logic
+            const model = file.camera_model || "Unknown";
+            let tag = sourceTags.find((t) => t.cameraAliases.includes(model));
 
-          if (!tag) {
-            // Calculate relative path in STAGING
-            // file.file_path is in stagingPath.
-            // We need relative path from stagingPath to match the relative path from sourcePath used in groupings.
+            if (!tag) {
+              // Calculate relative path in STAGING
+              // file.file_path is in stagingPath.
+              // We need relative path from stagingPath to match the relative path from sourcePath used in groupings.
 
-            let fileDir = file.file_path.substring(0, file.file_path.lastIndexOf('/'));
-            if (fileDir.startsWith(stagingPath)) {
-              let relDir = fileDir.substring(stagingPath.length);
-              if (relDir.startsWith('/')) relDir = relDir.substring(1);
-              // The "staging" dir structure mirrors "source" dir structure (rsync -a source/ staging/source_name/)
-              // WAIT: rsync creates a subdirectory with the source folder name inside stagingPath? 
-              // Let's check copy_to_staging implementation.
-              // "rsync -a source staging" -> if source is /a/b, and staging is /x/y, rsync makes /x/y/b/...
-              // So we need to strip the first component of the relative path to match the source relative path?
+              let fileDir = file.file_path.substring(0, file.file_path.lastIndexOf('/'));
+              if (fileDir.startsWith(stagingPath)) {
+                let relDir = fileDir.substring(stagingPath.length);
+                if (relDir.startsWith('/')) relDir = relDir.substring(1);
+                // The "staging" dir structure mirrors "source" dir structure (rsync -a source/ staging/source_name/)
+                // WAIT: rsync creates a subdirectory with the source folder name inside stagingPath? 
+                // Let's check copy_to_staging implementation.
+                // "rsync -a source staging" -> if source is /a/b, and staging is /x/y, rsync makes /x/y/b/...
+                // So we need to strip the first component of the relative path to match the source relative path?
 
-              // Actually, in scanSource, we stripped sourcePath. 
-              // Example: Source=/Users/me/Photos. File=/Users/me/Photos/2023/Image.jpg. RelDir=2023.
-              // In Staging: Staging=/Tmp/Stage. rsync creates /Tmp/Stage/Photos/2023/Image.jpg.
-              // So file.file_path is /Tmp/Stage/Photos/2023/Image.jpg.
-              // We need to extract "2023".
-              // So relative path from staging is "Photos/2023".
-              // We need to strip the first component "Photos".
+                // Actually, in scanSource, we stripped sourcePath. 
+                // Example: Source=/Users/me/Photos. File=/Users/me/Photos/2023/Image.jpg. RelDir=2023.
+                // In Staging: Staging=/Tmp/Stage. rsync creates /Tmp/Stage/Photos/2023/Image.jpg.
+                // So file.file_path is /Tmp/Stage/Photos/2023/Image.jpg.
+                // We need to extract "2023".
+                // So relative path from staging is "Photos/2023".
+                // We need to strip the first component "Photos".
 
-              if (relDir) {
-                const parts = relDir.split('/');
-                if (parts.length > 0) {
-                  // The first part is the source directory name itself.
-                  // The rest is the relative path inside source.
-                  // If parts.length == 1, it means it's in the root of source dir. (e.g. "Photos"), so RelDir should be "Root"?
-                  // Re-check scanSource logic:
-                  // if RelDir empty -> "Root".
-                  // In internal relative path, it was "Relative from Source Root".
+                if (relDir) {
+                  const parts = relDir.split('/');
+                  if (parts.length > 0) {
+                    // The first part is the source directory name itself.
+                    // The rest is the relative path inside source.
+                    // If parts.length == 1, it means it's in the root of source dir. (e.g. "Photos"), so RelDir should be "Root"?
+                    // Re-check scanSource logic:
+                    // if RelDir empty -> "Root".
+                    // In internal relative path, it was "Relative from Source Root".
 
-                  // Here, RelDir is "SourceDirName/SubDir/..."
-                  // matches = parts.slice(1).join('/');
-                  // if (parts.length === 1) matches = "Root";
+                    // Here, RelDir is "SourceDirName/SubDir/..."
+                    // matches = parts.slice(1).join('/');
+                    // if (parts.length === 1) matches = "Root";
 
-                  let matchPath = parts.length > 1 ? parts.slice(1).join('/') : "Root";
-                  tag = sourceTags.find((t) =>
-                    (t.directoryPatterns || []).some(pattern => matchPath === pattern) // Exact match on relative path string?
-                    // Previous logic was simple string includes. Now we have full relative paths.
-                    // Let's assume user selected "2023/Trip" in dropdown. Tag pattern is "2023/Trip".
-                    // matchPath is "2023/Trip".
-                    // We should check exact match or at least "starts with"?
-                    // For now, let's use check if one includes the other or exact match.
-                    // Actually, the dropdown assigns the specific grouping key.
-                    // The grouping key IS the relative path.
-                    // So we should look for exact match of the key.
-                  );
-
-                  if (!tag) {
-                    // Fallback to simple inclusion check just in case
+                    let matchPath = parts.length > 1 ? parts.slice(1).join('/') : "Root";
                     tag = sourceTags.find((t) =>
-                      (t.directoryPatterns || []).some(pattern => matchPath.includes(pattern))
+                      (t.directoryPatterns || []).some(pattern => matchPath === pattern) // Exact match on relative path string?
+                      // Previous logic was simple string includes. Now we have full relative paths.
+                      // Let's assume user selected "2023/Trip" in dropdown. Tag pattern is "2023/Trip".
+                      // matchPath is "2023/Trip".
+                      // We should check exact match or at least "starts with"?
+                      // For now, let's use check if one includes the other or exact match.
+                      // Actually, the dropdown assigns the specific grouping key.
+                      // The grouping key IS the relative path.
+                      // So we should look for exact match of the key.
                     );
+
+                    if (!tag) {
+                      // Fallback to simple inclusion check just in case
+                      tag = sourceTags.find((t) =>
+                        (t.directoryPatterns || []).some(pattern => matchPath.includes(pattern))
+                      );
+                    }
                   }
                 }
               }
             }
-          }
 
-          // Original fallback if relative path logic fails or is mismatched
-          if (!tag) {
-            const parts = file.file_path.split("/");
-            const parentDir = parts.length > 1 ? parts[parts.length - 2] : "Root";
-            tag = sourceTags.find((t) =>
-              (t.directoryPatterns || []).some(pattern => parentDir.includes(pattern))
-            );
-          }
+            // Original fallback if relative path logic fails or is mismatched
+            if (!tag) {
+              const parts = file.file_path.split("/");
+              const parentDir = parts.length > 1 ? parts[parts.length - 2] : "Root";
+              tag = sourceTags.find((t) =>
+                (t.directoryPatterns || []).some(pattern => parentDir.includes(pattern))
+              );
+            }
 
-          if (tag) {
-            try {
-              await invoke("write_exif_keywords", {
-                filePath: file.file_path,
-                keywords: [tag.name],
-              });
-              taggedCount++;
-            } catch (e) {
-              addToLogs(`Failed to tag ${file.file_path}: ${e}`);
+            if (tag) {
+              try {
+                await invoke("write_exif_keywords", {
+                  filePath: file.file_path,
+                  keywords: [tag.name],
+                });
+                taggedCount++;
+              } catch (e) {
+                addToLogs(`Failed to tag ${file.file_path}: ${e}`);
+              }
             }
           }
-        }
-        addToLogs(`Tagged ${taggedCount} files.`);
+          addToLogs(`Tagged ${taggedCount} files.`);
 
-        // 3. Phockup Staging -> Dest
-        setStatus('organizing');
-        addToLogs(`Running Phockup on staging...`);
+          // 3. Phockup Staging -> Dest
+          setStatus('organizing');
+          addToLogs(`Running Phockup on staging...`);
 
           const phockupCmd = navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup';
 
-        const runPhockup = () => {
-          return new Promise<void>(async (resolve, reject) => {
-            const threads = navigator.hardwareConcurrency || 4;
-            // Source is STAGING now
-            const args = [stagingPath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '-c', threads.toString()];
-            if (selectedStrategy === 'move') args.push('--move'); // Actually we might always 'move' from staging since it's a temp copy? 
-            // If we copy, we are left with a full staging dir. If we move, Phockup deletes sourced files in staging.
-            // Let's use Move from staging to cleanup as we go, or just delete directory after.
-            // Using copy is safer if we want to debug staging. Let's stick to user pref for now but defaulted to move?
-            // Actually, copying from staging duplicates data again. Moving from staging is best.
-            args.push('--move'); 
+          const runPhockup = () => {
+            return new Promise<void>(async (resolve, reject) => {
+              const threads = navigator.hardwareConcurrency || 4;
+              // Source is STAGING now
+              const args = [stagingPath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '-c', threads.toString()];
+              if (selectedStrategy === 'move') args.push('--move'); // Actually we might always 'move' from staging since it's a temp copy? 
+              // If we copy, we are left with a full staging dir. If we move, Phockup deletes sourced files in staging.
+              // Let's use Move from staging to cleanup as we go, or just delete directory after.
+              // Using copy is safer if we want to debug staging. Let's stick to user pref for now but defaulted to move?
+              // Actually, copying from staging duplicates data again. Moving from staging is best.
+              args.push('--move');
 
-            addToLogs(`Command: ${phockupCmd} ${args.join(' ')}`);
+              addToLogs(`Command: ${phockupCmd} ${args.join(' ')}`);
 
-            let command;
-            try {
-              command = Command.create(phockupCmd, args);
-            } catch (e) {
-              reject(e);
-              return;
-            }
-            await spawnAndTrack(command, resolve, reject);
-          });
-        };
+              let command;
+              try {
+                command = Command.create(phockupCmd, args);
+              } catch (e) {
+                reject(e);
+                return;
+              }
+              await spawnAndTrack(command, resolve, reject);
+            });
+          };
 
-        await runPhockup();
+          await runPhockup();
 
-        // 4. Cleanup Staging 
-        // setStatus('organizing'); // Keep status
-        addToLogs("Cleaning up staging directory...");
-        try {
-          await invoke('clean_staging', { path: stagingPath });
-          addToLogs("Staging directory cleaned.");
-        } catch (e) {
-          addToLogs(`Warning: Failed to clean staging path: ${e}`);
-        }
+          // 4. Cleanup Staging 
+          // setStatus('organizing'); // Keep status
+          addToLogs("Cleaning up staging directory...");
+          try {
+            await invoke('clean_staging', { path: stagingPath });
+            addToLogs("Staging directory cleaned.");
+          } catch (e) {
+            addToLogs(`Warning: Failed to clean staging path: ${e}`);
+          }
         } // End of tagging enabled block
 
       }
@@ -758,93 +759,93 @@ export function Ingest() {
             {enableTagging && (
               <>
 
-              {/* Tag Management */}
-              <div className="mb-6">
-                <div className="flex gap-2 mb-4">
-                  <input
-                    type="text"
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    placeholder="Create new source tag..."
-                    className="flex-1 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 focus:border-purple-500 focus:outline-none text-white"
-                    onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
-                  />
-                  <button
-                    onClick={handleCreateTag}
-                    disabled={!newTagName.trim()}
-                    className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
+                {/* Tag Management */}
+                <div className="mb-6">
+                  <div className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      placeholder="Create new source tag..."
+                      className="flex-1 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 focus:border-purple-500 focus:outline-none text-white"
+                      onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                    />
+                    <button
+                      onClick={handleCreateTag}
+                      disabled={!newTagName.trim()}
+                      className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {sourceTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {sourceTags.map(tag => (
+                        <span key={tag.id} className={`${tag.color} px-2 py-1 rounded-full text-xs font-medium text-white flex items-center gap-1`}>
+                          <Tag className="w-3 h-3" />
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {sourceTags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {sourceTags.map(tag => (
-                      <span key={tag.id} className={`${tag.color} px-2 py-1 rounded-full text-xs font-medium text-white flex items-center gap-1`}>
-                        <Tag className="w-3 h-3" />
-                        {tag.name}
-                      </span>
-                    ))}
+                {/* Camera Models */}
+                {cameraModels.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-slate-400 mb-2 flex items-center gap-2">
+                      <Camera className="w-4 h-4" /> Camera Models
+                    </h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                      {cameraModels.map((cm) => (
+                        <div key={cm.model} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700 text-sm">
+                          <div className="min-w-0 flex-1 mr-2">
+                            <div className="truncate font-medium" title={cm.model}>{cm.model}</div>
+                            <div className="text-xs text-slate-500">{cm.count} files</div>
+                          </div>
+                          <select
+                            value={sourceTags.find(t => t.cameraAliases.includes(cm.model))?.id || ""}
+                            onChange={(e) => handleAssignCameraToTag(cm.model, e.target.value || null)}
+                            className="w-32 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-xs focus:border-purple-500 focus:outline-none"
+                          >
+                            <option value="">Unassigned</option>
+                            {sourceTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* Camera Models */}
-              {cameraModels.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-slate-400 mb-2 flex items-center gap-2">
-                    <Camera className="w-4 h-4" /> Camera Models
-                  </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                    {cameraModels.map((cm) => (
-                      <div key={cm.model} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700 text-sm">
-                        <div className="min-w-0 flex-1 mr-2">
-                          <div className="truncate font-medium" title={cm.model}>{cm.model}</div>
-                          <div className="text-xs text-slate-500">{cm.count} files</div>
+                {/* Source Directories */}
+                {directoryGroups.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-400 mb-2 flex items-center gap-2">
+                      <FolderTree className="w-4 h-4" /> Source Directories
+                    </h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                      {directoryGroups.map((dg) => (
+                        <div key={dg.directory} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700 text-sm">
+                          <div className="min-w-0 flex-1 mr-2">
+                            <div className="truncate font-medium" title={dg.directory}>{dg.directory}</div>
+                            <div className="text-xs text-slate-500">{dg.count} files</div>
+                          </div>
+                          <select
+                            value={sourceTags.find(t => (t.directoryPatterns || []).includes(dg.directory))?.id || ""}
+                            onChange={(e) => handleAssignDirToTag(dg.directory, e.target.value || null)}
+                            className="w-32 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-xs focus:border-purple-500 focus:outline-none"
+                          >
+                            <option value="">Unassigned</option>
+                            {sourceTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
                         </div>
-                        <select
-                          value={sourceTags.find(t => t.cameraAliases.includes(cm.model))?.id || ""}
-                          onChange={(e) => handleAssignCameraToTag(cm.model, e.target.value || null)}
-                          className="w-32 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-xs focus:border-purple-500 focus:outline-none"
-                        >
-                          <option value="">Unassigned</option>
-                          {sourceTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Source Directories */}
-              {directoryGroups.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-400 mb-2 flex items-center gap-2">
-                    <FolderTree className="w-4 h-4" /> Source Directories
-                  </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                    {directoryGroups.map((dg) => (
-                      <div key={dg.directory} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700 text-sm">
-                        <div className="min-w-0 flex-1 mr-2">
-                          <div className="truncate font-medium" title={dg.directory}>{dg.directory}</div>
-                          <div className="text-xs text-slate-500">{dg.count} files</div>
-                        </div>
-                        <select
-                          value={sourceTags.find(t => (t.directoryPatterns || []).includes(dg.directory))?.id || ""}
-                          onChange={(e) => handleAssignDirToTag(dg.directory, e.target.value || null)}
-                          className="w-32 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-xs focus:border-purple-500 focus:outline-none"
-                        >
-                          <option value="">Unassigned</option>
-                          {sourceTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {cameraModels.length === 0 && directoryGroups.length === 0 && (
+                {cameraModels.length === 0 && directoryGroups.length === 0 && (
                   <div className="text-center py-8 text-slate-500 text-sm bg-slate-900/30 rounded-lg border border-dashed border-slate-800">
                     {!sourcePath ? (
                       <p>Select a source folder in Step 1 to scan for cameras and directories</p>
@@ -853,8 +854,8 @@ export function Ingest() {
                     ) : (
                       <p>No cameras or directories found in source</p>
                     )}
-                </div>
-              )}
+                  </div>
+                )}
               </>
             )}
           </div>

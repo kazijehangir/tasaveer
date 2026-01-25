@@ -4,9 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Ingest } from '../Ingest';
 import { invoke } from '@tauri-apps/api/core';
+import { load } from '@tauri-apps/plugin-store';
 
 // Get the mocked functions from the global setup
 const mockInvoke = vi.mocked(invoke);
+const mockLoad = vi.mocked(load);
 
 const renderIngest = () => {
     return render(
@@ -20,14 +22,22 @@ describe('Ingest', () => {
     beforeEach(() => {
         vi.clearAllMocks();
 
+        // Configure mock store with test data
+        const mockStore = {
+            get: vi.fn((key: string) => {
+                const data: Record<string, string> = {
+                    archivePath: '/test/archive',
+                };
+                return Promise.resolve(data[key]);
+            }),
+            set: vi.fn(() => Promise.resolve()),
+            save: vi.fn(() => Promise.resolve()),
+        };
+
+        mockLoad.mockResolvedValue(mockStore as unknown as Awaited<ReturnType<typeof load>>);
+
         mockInvoke.mockImplementation((cmd: string) => {
             switch (cmd) {
-                case 'load_settings':
-                    return Promise.resolve(JSON.stringify({
-                        archivePath: '/test/archive',
-                        phockupPath: '',
-                        immichGoPath: '',
-                    }));
                 case 'find_zips':
                     return Promise.resolve(['takeout-1.zip', 'takeout-2.zip']);
                 default:
@@ -113,7 +123,7 @@ describe('Ingest', () => {
             renderIngest();
 
             await waitFor(() => {
-                expect(mockInvoke).toHaveBeenCalledWith('load_settings');
+                expect(mockLoad).toHaveBeenCalledWith('settings.json');
             });
         });
     });

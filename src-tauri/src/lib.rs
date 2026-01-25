@@ -1,6 +1,7 @@
 use std::fs;
 
 mod dedup;
+mod exiftool_daemon;
 mod metadata;
 mod state; // Add state module
 

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { load } from "@tauri-apps/plugin-store";
 import {
     Sparkles,
     Calendar,
@@ -113,12 +114,10 @@ export function Clean() {
 
         async function loadSettings() {
             try {
-                const settingsStr = await invoke<string>("load_settings");
-                if (settingsStr) {
-                    const settings = JSON.parse(settingsStr);
-                    if (settings.archivePath) {
-                        setArchivePath(settings.archivePath);
-                    }
+                const store = await load('settings.json');
+                const archivePathValue = await store.get<string>('archivePath');
+                if (archivePathValue) {
+                    setArchivePath(archivePathValue);
                 }
                 // Check czkawka availability
                 try {
@@ -180,6 +179,7 @@ export function Clean() {
             console.log("Scanning metadata for:", archivePath);
             const results = await invoke<FileMetadataInfo[]>("scan_missing_dates", {
                 path: archivePath,
+                operationId: "scan_missing_dates",
             });
             console.log("Metadata scan results:", results);
             setMetadataResults(results);

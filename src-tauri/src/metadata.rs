@@ -323,6 +323,7 @@ struct ScanProgress {
 }
 
 /// Scan a directory recursively for media files with progress and cancellation
+/// Uses ExifTool daemon for optimized batch processing.
 #[tauri::command]
 pub async fn scan_missing_dates(
     app_handle: tauri::AppHandle,
@@ -336,17 +337,18 @@ pub async fn scan_missing_dates(
 
     let cancel_token = state.register_token(&operation_id);
 
-    // First count total files for progress (optional but good UX)
-    // This might be slow on huge dirs, so maybe we just send "processed count" without total?
-    // Let's do a quick count first if possible, or just emit processed count.
+    // Try to start the ExifTool daemon for batch processing
+    let daemon_available = state.exiftool_daemon.ensure_started(None).is_ok();
+    if daemon_available {
+        eprintln!("[INFO] Using ExifTool daemon for optimized scanning");
+    } else {
+        eprintln!("[WARN] ExifTool daemon unavailable, falling back to per-file processing");
+    }
 
     let mut results = Vec::new();
     let mut scanned_count = 0;
 
     let walker = WalkDir::new(&path).follow_links(true);
-
-    // We can't easily count efficiently without walking twice.
-    // Let's walk once and emit progress.
 
     for entry in walker.into_iter().filter_map(|e| e.ok()) {
         // Check cancellation
@@ -388,18 +390,11 @@ pub async fn scan_missing_dates(
         let file_path_str = file_path.to_string_lossy().to_string();
         let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
-        // Try to read EXIF
-        let (has_date, camera_model) = match read_exif_metadata(file_path_str.clone()) {
-            Ok(metadata) => (
-                metadata.date_time_original.is_some(),
-                match (metadata.make, metadata.model) {
-                    (Some(make), Some(model)) => Some(format!("{} {}", make.trim(), model.trim())),
-                    (None, Some(model)) => Some(model),
-                    (Some(make), None) => Some(make),
-                    (None, None) => None,
-                },
-            ),
-            Err(_) => (false, None),
+        // Try to read EXIF using daemon if available, fall back to Command
+        let (has_date, camera_model) = if daemon_available {
+            read_exif_with_daemon(&state.exiftool_daemon, &file_path_str)
+        } else {
+            read_exif_with_command(&file_path_str)
         };
 
         // Try to extract date from filename
@@ -428,6 +423,61 @@ pub async fn scan_missing_dates(
 
     state.remove_token(&operation_id);
     Ok(results)
+}
+
+/// Read EXIF metadata using the daemon (fast path).
+fn read_exif_with_daemon(
+    daemon: &crate::exiftool_daemon::SharedExifToolDaemon,
+    file_path: &str,
+) -> (bool, Option<String>) {
+    match daemon.read_metadata_json(file_path) {
+        Ok(json_str) => parse_exif_json_for_scan(&json_str),
+        Err(_) => (false, None),
+    }
+}
+
+/// Read EXIF metadata by spawning exiftool (slow fallback path).
+fn read_exif_with_command(file_path: &str) -> (bool, Option<String>) {
+    match read_exif_metadata(file_path.to_string()) {
+        Ok(metadata) => (
+            metadata.date_time_original.is_some(),
+            match (metadata.make, metadata.model) {
+                (Some(make), Some(model)) => Some(format!("{} {}", make.trim(), model.trim())),
+                (None, Some(model)) => Some(model),
+                (Some(make), None) => Some(make),
+                (None, None) => None,
+            },
+        ),
+        Err(_) => (false, None),
+    }
+}
+
+/// Parse exiftool JSON output for scan results (date presence and camera model).
+fn parse_exif_json_for_scan(json_str: &str) -> (bool, Option<String>) {
+    let parsed: Result<Vec<serde_json::Value>, _> = serde_json::from_str(json_str);
+
+    match parsed {
+        Ok(arr) if !arr.is_empty() => {
+            let data = &arr[0];
+            let has_date = data
+                .get("DateTimeOriginal")
+                .and_then(|v| v.as_str())
+                .is_some();
+
+            let make = data.get("Make").and_then(|v| v.as_str());
+            let model = data.get("Model").and_then(|v| v.as_str());
+
+            let camera_model = match (make, model) {
+                (Some(m), Some(mo)) => Some(format!("{} {}", m.trim(), mo.trim())),
+                (None, Some(mo)) => Some(mo.to_string()),
+                (Some(m), None) => Some(m.to_string()),
+                (None, None) => None,
+            };
+
+            (has_date, camera_model)
+        }
+        _ => (false, None),
+    }
 }
 
 #[cfg(test)]

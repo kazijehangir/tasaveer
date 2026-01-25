@@ -76,9 +76,9 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
 ### Phase 2: Core Organization Logic (Rust)
 
 #### 2.1 ExifTool Performance Optimization
--   [ ] Implement `ExifToolDaemon` with `-stay_open` mode (persistent process)
--   [ ] Add batch processing for scan operations via stdin/stdout
--   [ ] Target 10x+ improvement in `scan_missing_dates` performance
+-   [x] Implement `ExifToolDaemon` with `-stay_open` mode (persistent process)
+-   [x] Add batch processing for scan operations via stdin/stdout
+-   [ ] Benchmark and validate 10x+ improvement
 
 #### 2.2 ExifTool Sidecar Bundling
 -   [ ] Add `binaries/exiftool` to `externalBin` in `tauri.conf.json`
