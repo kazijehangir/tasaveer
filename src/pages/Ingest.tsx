@@ -2,7 +2,6 @@ import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, Image, Cloud, 
 import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { Command, Child } from "@tauri-apps/plugin-shell";
 import { load } from "@tauri-apps/plugin-store";
 
 // Types for source tagging
@@ -31,6 +30,14 @@ interface FileMetadataInfo {
   has_date: boolean;
   extracted_date: { date: string; time: string | null; source: string } | null;
   camera_model: string | null;
+}
+
+interface OrganizeResult {
+  total_files: number;
+  organized: number;
+  skipped: number;
+  duplicates: number;
+  errors: number;
 }
 
 // Predefined colors for tags
@@ -66,7 +73,6 @@ export function Ingest() {
   const [status, setStatus] = useState<'idle' | 'scanning' | 'copying' | 'tagging' | 'organizing' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLogsExpanded, setIsLogsExpanded] = useState(false);
-  const runningCommandsRef = useRef<Array<{ kill: () => Promise<void> }>>([]);
   const cancelledRef = useRef(false);
 
   // Tagging State
@@ -162,18 +168,12 @@ export function Ingest() {
     setLogs(prev => [...prev, 'Canceling operations...']); // Immediate feedback
     cancelledRef.current = true;
 
-    // Copy the array because 'close' handlers will mutate runningCommandsRef.current
-    const processesToKill = [...runningCommandsRef.current];
-    runningCommandsRef.current = []; // Clear immediately to prevent further handling
-
-    for (const cmd of processesToKill) {
-      try {
-        await cmd.kill();
-        logBufferRef.current.push('Killed running process.');
-      } catch (err) {
-        console.error('Failed to kill command:', err);
-        logBufferRef.current.push(`Failed to kill process: ${err}`);
-      }
+    // Cancel via Rust state management
+    try {
+      await invoke('cancel_operation', { operationId: 'organize_ingest' });
+      logBufferRef.current.push('Cancel signal sent.');
+    } catch (err) {
+      console.error('Failed to cancel:', err);
     }
 
     logBufferRef.current.push('Operation canceled by user.');
@@ -367,7 +367,6 @@ export function Ingest() {
     setLogs([]);
     logBufferRef.current = [];
     setIsLogsExpanded(true);
-    runningCommandsRef.current = [];
     cancelledRef.current = false;
 
     addToLogs('Initializing ingest process...');
@@ -385,32 +384,29 @@ export function Ingest() {
       if (ingestType === 'local') {
         // MULTI-STEP WORKFLOW
 
-        // If tagging is disabled, skip staging and tagging -> Run Phockup directly on source
+        // If tagging is disabled, skip staging and tagging -> Run organize directly on source
         if (!enableTagging) {
           setStatus('organizing');
-          addToLogs('Tagging skipped. Running Phockup on source directly...');
-          const phockupCmd = navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup';
+          addToLogs('Tagging skipped. Organizing files directly from source...');
+          addToLogs(`Source: ${sourcePath}`);
+          addToLogs(`Destination: ${destPath}`);
+          addToLogs(`Strategy: ${selectedStrategy}`);
 
-          await new Promise<void>(async (resolve, reject) => {
-            const threads = navigator.hardwareConcurrency || 4;
-            // Source is SOURCE now
-            const args = [sourcePath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '-c', threads.toString()];
-            // Copy vs Move based on user selection
-            if (selectedStrategy === 'move') {
-              args.push('--move');
-            }
-
-            addToLogs(`Command: ${phockupCmd} ${args.join(' ')}`);
-
-            let command;
-            try {
-              command = Command.create(phockupCmd, args);
-            } catch (e) {
-              reject(e);
-              return;
-            }
-            await spawnAndTrack(command, resolve, reject);
+          const result = await invoke<OrganizeResult>('run_organize', {
+            sourcePath,
+            destPath,
+            operationId: 'organize_ingest',
+            moveFiles: selectedStrategy === 'move',
           });
+
+          addToLogs(`Organization complete:`);
+          addToLogs(`  - Total files: ${result.total_files}`);
+          addToLogs(`  - Organized: ${result.organized}`);
+          addToLogs(`  - Skipped (no date): ${result.skipped}`);
+          addToLogs(`  - Duplicates: ${result.duplicates}`);
+          if (result.errors > 0) {
+            addToLogs(`  - Errors: ${result.errors}`);
+          }
         } else {
           // 1. Copy to Staging
           setStatus('copying');
@@ -485,34 +481,27 @@ export function Ingest() {
           }
           addToLogs(`Tagged ${taggedCount} files.`);
 
-          // 3. Phockup Staging -> Dest
+          // 3. Organize Staging -> Dest
           setStatus('organizing');
-          addToLogs(`Running Phockup on staging...`);
+          addToLogs(`Organizing files from staging to destination...`);
+          addToLogs(`Source: ${stagingPath}`);
+          addToLogs(`Destination: ${destPath}`);
 
-          const phockupCmd = navigator.platform.toLowerCase().includes('win') ? 'phockup.bat' : 'phockup';
+          const result = await invoke<OrganizeResult>('run_organize', {
+            sourcePath: stagingPath,
+            destPath,
+            operationId: 'organize_ingest',
+            moveFiles: true, // Always move from staging
+          });
 
-          const runPhockup = () => {
-            return new Promise<void>(async (resolve, reject) => {
-              const threads = navigator.hardwareConcurrency || 4;
-              // Source is STAGING now
-              const args = [stagingPath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '-c', threads.toString()];
-              if (selectedStrategy === 'move') args.push('--move');
-              args.push('--move');
-
-              addToLogs(`Command: ${phockupCmd} ${args.join(' ')}`);
-
-              let command;
-              try {
-                command = Command.create(phockupCmd, args);
-              } catch (e) {
-                reject(e);
-                return;
-              }
-              await spawnAndTrack(command, resolve, reject);
-            });
-          };
-
-          await runPhockup();
+          addToLogs(`Organization complete:`);
+          addToLogs(`  - Total files: ${result.total_files}`);
+          addToLogs(`  - Organized: ${result.organized}`);
+          addToLogs(`  - Skipped (no date): ${result.skipped}`);
+          addToLogs(`  - Duplicates: ${result.duplicates}`);
+          if (result.errors > 0) {
+            addToLogs(`  - Errors: ${result.errors}`);
+          }
 
           // 4. Cleanup Staging 
           addToLogs("Cleaning up staging directory...");
@@ -541,57 +530,6 @@ export function Ingest() {
         setLogs(prev => [...prev, `Failed to execute ingest: ${err}`]);
       }
     }
-  };
-
-  const spawnAndTrack = (command: Command<string>, resolve: (val?: void) => void, reject: (err: any) => void) => {
-    return new Promise<void>(async (internalResolve) => {
-      let child: Child | null = null;
-
-      command.on('close', (data: { code: number | null, signal: number | null }) => {
-        if (cancelledRef.current) return;
-        if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
-
-        if (data.code === 0) {
-          resolve();
-        } else if (data.code === null) {
-          addToLogs(`Process terminated.`);
-          resolve();
-        } else {
-          addToLogs(`Process exited with code ${data.code}`);
-          reject(new Error(`Process exited with code ${data.code}`));
-        }
-        internalResolve();
-      });
-
-      command.on('error', (error: any) => {
-        if (cancelledRef.current) return;
-        if (child) runningCommandsRef.current = runningCommandsRef.current.filter(c => c !== child);
-        addToLogs(`Process error events: ${error}`);
-        reject(error);
-        internalResolve();
-      });
-
-      command.stdout.on('data', (line: string) => !cancelledRef.current && addToLogs(line));
-      command.stderr.on('data', (line: string) => !cancelledRef.current && addToLogs(line));
-
-      try {
-        addToLogs('Spawning child process...');
-        child = await command.spawn();
-        addToLogs(`Child process spawned. PID: ${child.pid}`);
-        if (cancelledRef.current) {
-          await child.kill();
-          reject(new Error('Cancelled'));
-          internalResolve();
-          return;
-        }
-        runningCommandsRef.current.push(child);
-      } catch (err) {
-        console.error('Spawn failed:', err);
-        addToLogs(`Failed to spawn process: ${err}`);
-        reject(err);
-        internalResolve();
-      }
-    });
   };
 
   return (
@@ -906,7 +844,7 @@ export function Ingest() {
                     3
                   </div>
                   <div>
-                    <p className={`font-medium ${['organizing'].includes(status) ? 'text-primary-500' : 'text-text-main'}`}>Organize (Phockup)</p>
+                    <p className={`font-medium ${['organizing'].includes(status) ? 'text-primary-500' : 'text-text-main'}`}>Organize</p>
                     {status === 'organizing' && <span className="text-xs text-primary-500 animate-pulse">Organizing...</span>}
                   </div>
                 </div>
