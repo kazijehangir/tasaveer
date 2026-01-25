@@ -1,118 +1,48 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Import, RefreshCw, Sparkles, FolderHeart } from "lucide-react";
-import { clsx } from "clsx";
-
-const NAV_ITEMS = [
-  {
-    path: "/",
-    label: "Home",
-    icon: LayoutDashboard,
-  },
-  {
-    path: "/ingest",
-    label: "Ingest",
-    icon: Import,
-    step: 1
-  },
-  {
-    path: "/clean",
-    label: "Clean",
-    icon: Sparkles,
-    step: 2
-  },
-  {
-    path: "/organize",
-    label: "Organize",
-    icon: FolderHeart,
-    step: 3
-  },
-  {
-    path: "/sync",
-    label: "Sync",
-    icon: RefreshCw,
-    step: 4
-  },
-];
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Sidebar } from "../components/layout/Sidebar";
+import { useEffect, useState } from "react";
 
 export function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("dashboard");
+
+  // Sync route with active tab
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === "/") setActiveTab("dashboard");
+    else if (path === "/ingest") setActiveTab("ingest");
+    else if (path === "/organize") setActiveTab("organize");
+    else if (path === "/clean") setActiveTab("cleanup");
+    else if (path === "/sync") setActiveTab("sync");
+  }, [location.pathname]);
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "dashboard") navigate("/");
+    else if (tabId === "cleanup") navigate("/clean");
+    else navigate(`/${tabId}`);
+  };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900 text-white">
-      {/* Horizontal Navigation Bar */}
-      <header className="relative border-b border-slate-700/50 backdrop-blur-xl bg-slate-800/50">
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-purple-600/10 pointer-events-none" />
+    <div className="flex min-h-screen bg-background text-text-main font-sans selection:bg-primary-500/30">
+      {/* Sidebar - Fixed Position */}
+      <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
 
-        <div className="relative z-10 px-8 py-4">
-          <div className="flex flex-row items-center justify-between">
-            {/* Branding */}
-            <div className="flex flex-row items-center gap-3">
-              <img src="/app-icon.png" alt="Tasaveer Logo" className="w-10 h-10 rounded-xl shadow-lg" />
-              <div>
-                <h1 className="text-2xl font-bold gradient-text leading-none">Tasaveer</h1>
-                <p className="text-xs text-slate-500">Media Archive Manager</p>
-              </div>
-            </div>
+      {/* Main Content Area */}
+      <main className="flex-1 ml-64 p-8 relative">
+        {/* Background Ambient Glow - Removed for cleaner Tahoe look */}
+        {/* <div className="fixed inset-0 pointer-events-none z-0">
+          <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-primary-600/20 rounded-full blur-[128px] opacity-50" />
+          <div className="absolute bottom-[-10%] left-[20%] w-[400px] h-[400px] bg-accent-600/10 rounded-full blur-[128px] opacity-40" />
+        </div> */}
 
-            {/* Navigation */}
-            <nav className="flex flex-row items-center gap-2">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={clsx(
-                      "group relative px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-3",
-                      isActive
-                        ? "bg-slate-700/50 text-white shadow-sm ring-1 ring-white/10"
-                        : "hover:bg-slate-800/50 text-slate-300 hover:text-white"
-                    )}
-                  >
-                    {/* Badge for Step Number */}
-                    {item.step && (
-                      <div className={clsx(
-                        "flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold font-mono transition-colors",
-                        isActive
-                          ? "bg-blue-500/20 text-blue-300"
-                          : "bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-300"
-                      )}>
-                        {item.step}
-                      </div>
-                    )}
-
-                    <Icon className={clsx(
-                      "w-4 h-4 transition-colors",
-                      isActive ? "text-purple-400" : "text-slate-500 group-hover:text-purple-400/70"
-                    )} />
-
-                    <span className="font-medium text-sm">
-                      {item.label}
-                    </span>
-
-                    {isActive && (
-                      <div className="absolute inset-x-0 -bottom-[17px] h-0.5 bg-gradient-to-r from-purple-500 to-blue-500" />
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
-
-            {/* Version Badge */}
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse-glow" />
-              <span>v0.1.0</span>
-            </div>
-          </div>
+        {/* Content Container */}
+        <div className="relative z-10 max-w-7xl mx-auto animate-fade-in">
+          <Outlet />
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto bg-slate-900 p-8">
-        <Outlet />
       </main>
     </div>
   );
 }
+

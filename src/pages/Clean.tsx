@@ -293,10 +293,10 @@ export function Clean() {
         <div className="space-y-8 animate-fade-in pb-20">
             {/* Header */}
             <div>
-                <h1 className="text-4xl font-bold mb-2">
+                <h1 className="text-4xl font-bold mb-2 text-text-main">
                     Clean & <span className="gradient-text">Dedup</span>
                 </h1>
-                <p className="text-slate-400 text-lg">
+                <p className="text-text-muted text-lg">
                     Fix missing metadata and find duplicate files in your archive
                 </p>
             </div>
@@ -304,14 +304,14 @@ export function Clean() {
             {/* Error Display */}
             {error && (
                 <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0" />
                     <div className="flex-1">
-                        <p className="text-red-300 font-medium">Error</p>
-                        <p className="text-red-400 text-sm">{error}</p>
+                        <p className="text-red-600 dark:text-red-300 font-medium">Error</p>
+                        <p className="text-red-500 dark:text-red-400 text-sm">{error}</p>
                     </div>
                     <button
                         onClick={() => setError(null)}
-                        className="text-red-400 hover:text-red-300 text-sm"
+                        className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 text-sm"
                     >
                         Dismiss
                     </button>
@@ -322,27 +322,27 @@ export function Clean() {
             <div className="glass-card p-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-lg bg-purple-500/20">
-                            <FolderOpen className="w-6 h-6 text-purple-400" />
+                        <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-500/20">
+                            <FolderOpen className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                         </div>
                         <div>
-                            <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">
+                            <p className="text-xs text-text-muted uppercase tracking-wider font-bold">
                                 Archive Path
                             </p>
-                            <p className="text-sm font-medium truncate max-w-md">
+                            <p className="text-sm font-medium truncate max-w-md text-text-main">
                                 {archivePath || "No path selected"}
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={handleSelectPath}
-                        className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors text-sm font-medium"
+                        className="px-4 py-2 rounded-lg bg-neutral-200 dark:bg-slate-700 hover:bg-neutral-300 dark:hover:bg-slate-600 transition-colors text-sm font-medium text-text-main"
                     >
                         Change
                     </button>
                 </div>
                 {czkawkaStatus && (
-                    <div className="mt-4 text-xs text-slate-500 flex items-center gap-2">
+                    <div className="mt-4 text-xs text-text-muted flex items-center gap-2">
                         {czkawkaStatus.includes("found") ? (
                             <CheckCircle2 className="w-4 h-4 text-green-500" />
                         ) : (
@@ -358,8 +358,8 @@ export function Clean() {
                 <button
                     onClick={() => setActiveTab("metadata")}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "metadata"
-                        ? "bg-purple-500/20 text-purple-300 border border-purple-500/50"
-                        : "bg-slate-800/50 text-slate-400 hover:text-white border border-transparent"
+                        ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/50"
+                        : "bg-neutral-100 dark:bg-slate-800/50 text-text-muted hover:text-text-main border border-transparent"
                         }`}
                 >
                     <Calendar className="w-4 h-4" />
@@ -368,8 +368,8 @@ export function Clean() {
                 <button
                     onClick={() => setActiveTab("duplicates")}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "duplicates"
-                        ? "bg-blue-500/20 text-blue-300 border border-blue-500/50"
-                        : "bg-slate-800/50 text-slate-400 hover:text-white border border-transparent"
+                        ? "bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/50"
+                        : "bg-neutral-100 dark:bg-slate-800/50 text-text-muted hover:text-text-main border border-transparent"
                         }`}
                 >
                     <Copy className="w-4 h-4" />
@@ -378,8 +378,8 @@ export function Clean() {
                 <button
                     onClick={() => setActiveTab("similar")}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "similar"
-                        ? "bg-teal-500/20 text-teal-300 border border-teal-500/50"
-                        : "bg-slate-800/50 text-slate-400 hover:text-white border border-transparent"
+                        ? "bg-teal-50 dark:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/50"
+                        : "bg-neutral-100 dark:bg-slate-800/50 text-text-muted hover:text-text-main border border-transparent"
                         }`}
                 >
                     <Images className="w-4 h-4" />
@@ -392,33 +392,33 @@ export function Clean() {
                 <div className="space-y-6">
                     <div className="glass-card p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-bold flex items-center gap-2">
-                                <Sparkles className="w-5 h-5 text-purple-400" />
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-text-main">
+                                <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                                 Metadata Fixer
                             </h2>
                             <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-2 text-sm text-slate-400">
+                                <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">
                                     <input
                                         type="checkbox"
                                         checked={showOnlyMissing}
                                         onChange={(e) => setShowOnlyMissing(e.target.checked)}
-                                        className="rounded border-slate-600"
+                                        className="rounded border-neutral-400 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
                                     />
                                     Show only missing dates
                                 </label>
                                 {isScanning ? (
                                     <div className="flex items-center gap-3">
                                         <div className="flex flex-col items-end">
-                                            <span className="text-xs text-slate-400 font-mono animate-pulse">
+                                            <span className="text-xs text-text-muted font-mono animate-pulse">
                                                 {progress || "Scanning..."}
                                             </span>
-                                            <div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
+                                            <div className="w-32 h-1 bg-neutral-200 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
                                                 <div className="h-full bg-purple-500 animate-indeterminate-bar" />
                                             </div>
                                         </div>
                                         <button
                                             onClick={handleCancel}
-                                            className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                            className="px-3 py-1 bg-red-500/10 text-red-500 dark:text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
                                         >
                                             Cancel
                                         </button>
@@ -438,11 +438,11 @@ export function Clean() {
 
                         {metadataResults.length > 0 && (
                             <>
-                                <div className="text-sm text-slate-400 mb-4">
+                                <div className="text-sm text-text-muted mb-4">
                                     Found {filteredMetadata.length} files
                                     {showOnlyMissing && ` missing dates`}
                                     {filesWithExtractedDate.length > 0 && (
-                                        <span className="text-green-400 ml-2">
+                                        <span className="text-green-600 dark:text-green-400 ml-2">
                                             ({filesWithExtractedDate.length} can be fixed from filename)
                                         </span>
                                     )}
@@ -454,7 +454,7 @@ export function Clean() {
                                             key={file.file_path}
                                             className={`p-3 rounded-lg border transition-all ${file.extracted_date
                                                 ? "bg-green-500/5 border-green-500/20"
-                                                : "bg-slate-800/30 border-slate-700"
+                                                : "bg-neutral-50 dark:bg-slate-800/30 border-border"
                                                 }`}
                                         >
                                             <div className="flex items-center justify-between">
@@ -472,14 +472,14 @@ export function Clean() {
                                                                 }
                                                                 setSelectedForFix(newSet);
                                                             }}
-                                                            className="rounded border-slate-600"
+                                                            className="rounded border-neutral-400 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
                                                         />
                                                     )}
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="text-sm font-medium truncate">
+                                                        <p className="text-sm font-medium truncate text-text-main">
                                                             {file.file_path.split("/").pop()}
                                                         </p>
-                                                        <div className="flex items-center gap-4 text-xs text-slate-500">
+                                                        <div className="flex items-center gap-4 text-xs text-text-muted">
                                                             {file.camera_model && (
                                                                 <span className="flex items-center gap-1">
                                                                     <Camera className="w-3 h-3" />
@@ -487,20 +487,20 @@ export function Clean() {
                                                                 </span>
                                                             )}
                                                             {file.has_date ? (
-                                                                <span className="text-green-400">Has date</span>
+                                                                <span className="text-green-500 dark:text-green-400">Has date</span>
                                                             ) : (
-                                                                <span className="text-yellow-400">Missing date</span>
+                                                                <span className="text-yellow-600 dark:text-yellow-400">Missing date</span>
                                                             )}
                                                         </div>
                                                     </div>
                                                 </div>
                                                 {file.extracted_date && (
                                                     <div className="text-right">
-                                                        <p className="text-sm text-green-400 font-medium">
+                                                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
                                                             {file.extracted_date.date}
                                                             {file.extracted_date.time && ` ${file.extracted_date.time}`}
                                                         </p>
-                                                        <p className="text-xs text-slate-500">
+                                                        <p className="text-xs text-text-muted">
                                                             from {file.extracted_date.source}
                                                         </p>
                                                     </div>
@@ -525,7 +525,7 @@ export function Clean() {
                         )}
 
                         {metadataResults.length === 0 && !isScanning && (
-                            <div className="text-center py-12 text-slate-500">
+                            <div className="text-center py-12 text-text-muted">
                                 <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
                                 <p>Select an archive path and click Scan to find files with missing dates</p>
                             </div>
@@ -538,23 +538,23 @@ export function Clean() {
                 <div className="space-y-6">
                     <div className="glass-card p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-bold flex items-center gap-2">
-                                <Copy className="w-5 h-5 text-blue-400" />
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-text-main">
+                                <Copy className="w-5 h-5 text-blue-500 dark:text-blue-400" />
                                 Exact Duplicates
                             </h2>
                             {isScanning ? (
                                 <div className="flex items-center gap-3">
                                     <div className="flex flex-col items-end">
-                                        <span className="text-xs text-slate-400 font-mono animate-pulse">
+                                        <span className="text-xs text-text-muted font-mono animate-pulse">
                                             {progress || "Processing..."}
                                         </span>
-                                        <div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
+                                        <div className="w-32 h-1 bg-neutral-200 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
                                             <div className="h-full bg-blue-500 animate-indeterminate-bar" />
                                         </div>
                                     </div>
                                     <button
                                         onClick={handleCancel}
-                                        className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                        className="px-3 py-1 bg-red-500/10 text-red-500 dark:text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
                                     >
                                         Cancel
                                     </button>
@@ -573,10 +573,10 @@ export function Clean() {
 
                         {dupResults && (
                             <>
-                                <div className="flex items-center justify-between text-sm text-slate-400 mb-4">
+                                <div className="flex items-center justify-between text-sm text-text-muted mb-4">
                                     <div>
                                         Found {dupResults.total_groups} duplicate groups
-                                        <span className="text-red-400 ml-2">
+                                        <span className="text-red-500 dark:text-red-400 ml-2">
                                             ({formatBytes(dupResults.total_wasted_space)} wasted)
                                         </span>
                                     </div>
@@ -591,7 +591,7 @@ export function Clean() {
                                             });
                                             setSelectedForDelete(allDuplicates);
                                         }}
-                                        className="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs font-medium"
+                                        className="px-3 py-1 rounded bg-neutral-200 dark:bg-slate-700 hover:bg-neutral-300 dark:hover:bg-slate-600 text-xs font-medium text-text-main"
                                     >
                                         Select All Duplicates
                                     </button>
@@ -601,9 +601,9 @@ export function Clean() {
                                     {dupResults.duplicates.map((group, groupIdx) => (
                                         <div
                                             key={groupIdx}
-                                            className="p-4 rounded-lg bg-slate-800/30 border border-slate-700"
+                                            className="p-4 rounded-lg bg-neutral-50 dark:bg-slate-800/30 border border-border"
                                         >
-                                            <div className="text-xs text-slate-500 mb-2">
+                                            <div className="text-xs text-text-muted mb-2">
                                                 {group.files.length} identical files • {formatBytes(group.size_bytes)} each
                                             </div>
                                             <div className="space-y-2">
@@ -612,7 +612,7 @@ export function Clean() {
                                                         key={file.path}
                                                         className={`flex items-center justify-between p-2 rounded ${fileIdx === 0
                                                             ? "bg-green-500/10 border border-green-500/20"
-                                                            : "bg-slate-900/50"
+                                                            : "bg-neutral-100 dark:bg-slate-900/50"
                                                             }`}
                                                     >
                                                         <div className="flex items-center gap-3">
@@ -629,16 +629,16 @@ export function Clean() {
                                                                         }
                                                                         setSelectedForDelete(newSet);
                                                                     }}
-                                                                    className="rounded border-slate-600"
+                                                                    className="rounded border-neutral-400 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
                                                                 />
                                                             )}
                                                             {fileIdx === 0 && (
-                                                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded flex-shrink-0">
+                                                                <span className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-2 py-0.5 rounded flex-shrink-0">
                                                                     Keep
                                                                 </span>
                                                             )}
                                                             <span
-                                                                className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1"
+                                                                className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-text-main"
                                                                 style={{ direction: 'rtl', textAlign: 'left' }}
                                                                 title={file.path}
                                                             >
@@ -646,7 +646,7 @@ export function Clean() {
                                                             </span>
                                                         </div>
                                                         {file.modified && (
-                                                            <span className="text-xs text-slate-500">{file.modified}</span>
+                                                            <span className="text-xs text-text-muted">{file.modified}</span>
                                                         )}
                                                     </div>
                                                 ))}
@@ -659,7 +659,7 @@ export function Clean() {
                                     <div className="mt-4 flex justify-end">
                                         <button
                                             onClick={handleDeleteSelected}
-                                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 flex items-center gap-2 font-medium"
+                                            className="px-4 py-2 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 flex items-center gap-2 font-medium transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                             Delete {selectedForDelete.size} to Trash
@@ -670,11 +670,11 @@ export function Clean() {
                         )}
 
                         {!dupResults && !isScanning && (
-                            <div className="text-center py-12 text-slate-500">
+                            <div className="text-center py-12 text-text-muted">
                                 <Copy className="w-12 h-12 mx-auto mb-4 opacity-50" />
                                 <p>Click "Find Duplicates" to scan for identical files using hash comparison</p>
                                 {!czkawkaStatus?.includes("found") && (
-                                    <p className="text-yellow-500 mt-2">
+                                    <p className="text-yellow-600 dark:text-yellow-500 mt-2">
                                         ⚠️ czkawka_cli is required. Install it first.
                                     </p>
                                 )}
@@ -689,27 +689,27 @@ export function Clean() {
                     <div className="glass-card p-6">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h2 className="text-xl font-bold flex items-center gap-2">
-                                    <Images className="w-5 h-5 text-teal-400" />
+                                <h2 className="text-xl font-bold flex items-center gap-2 text-text-main">
+                                    <Images className="w-5 h-5 text-teal-500 dark:text-teal-400" />
                                     Similar Images
                                 </h2>
-                                <p className="text-sm text-slate-500 mt-1">
+                                <p className="text-sm text-text-muted mt-1">
                                     Review only — these may be intentional variations (burst shots, edits)
                                 </p>
                             </div>
                             {isScanning ? (
                                 <div className="flex items-center gap-3">
                                     <div className="flex flex-col items-end">
-                                        <span className="text-xs text-slate-400 font-mono animate-pulse">
+                                        <span className="text-xs text-text-muted font-mono animate-pulse">
                                             {progress || "Processing..."}
                                         </span>
-                                        <div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
+                                        <div className="w-32 h-1 bg-neutral-200 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
                                             <div className="h-full bg-teal-500 animate-indeterminate-bar" />
                                         </div>
                                     </div>
                                     <button
                                         onClick={handleCancel}
-                                        className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                        className="px-3 py-1 bg-red-500/10 text-red-500 dark:text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
                                     >
                                         Cancel
                                     </button>
@@ -728,7 +728,7 @@ export function Clean() {
 
                         {similarResults && (
                             <>
-                                <div className="text-sm text-slate-400 mb-4">
+                                <div className="text-sm text-text-muted mb-4">
                                     Found {similarResults.total_groups} groups of similar images
                                 </div>
 
@@ -736,18 +736,18 @@ export function Clean() {
                                     {similarResults.similar_groups.map((group, groupIdx) => (
                                         <div
                                             key={groupIdx}
-                                            className="p-4 rounded-lg bg-slate-800/30 border border-teal-500/20"
+                                            className="p-4 rounded-lg bg-neutral-50 dark:bg-slate-800/30 border border-teal-500/20"
                                         >
-                                            <div className="text-xs text-teal-400 mb-3">
+                                            <div className="text-xs text-teal-600 dark:text-teal-400 mb-3">
                                                 {group.files.length} similar images • {group.similarity.toFixed(0)}% match
                                             </div>
                                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                                 {group.files.map((file, fileIdx) => (
                                                     <div
                                                         key={file.path}
-                                                        className="rounded-lg bg-slate-900/50 overflow-hidden border border-slate-700 hover:border-teal-500/50 transition-colors"
+                                                        className="rounded-lg bg-white dark:bg-slate-900/50 overflow-hidden border border-border hover:border-teal-500/50 transition-colors"
                                                     >
-                                                        <div className="aspect-square bg-slate-800 relative">
+                                                        <div className="aspect-square bg-neutral-200 dark:bg-slate-800 relative">
                                                             <img
                                                                 src={convertFileSrc(file.path)}
                                                                 alt={file.path.split("/").pop() || ""}
@@ -761,9 +761,9 @@ export function Clean() {
                                                                 }}
                                                             />
                                                             <div
-                                                                className="absolute inset-0 items-center justify-center bg-slate-800 hidden"
+                                                                className="absolute inset-0 items-center justify-center bg-neutral-200 dark:bg-slate-800 hidden"
                                                             >
-                                                                <Eye className="w-8 h-8 text-slate-600" />
+                                                                <Eye className="w-8 h-8 text-neutral-400 dark:text-slate-600" />
                                                             </div>
                                                             {fileIdx === 0 && (
                                                                 <div className="absolute top-1 left-1 text-[10px] bg-teal-500/90 text-white px-1.5 py-0.5 rounded font-medium">
@@ -771,16 +771,16 @@ export function Clean() {
                                                                 </div>
                                                             )}
                                                             {file.similarity > 0 && (
-                                                                <div className="absolute top-1 right-1 text-[10px] bg-slate-900/80 text-slate-300 px-1.5 py-0.5 rounded">
+                                                                <div className="absolute top-1 right-1 text-[10px] bg-neutral-900/80 text-white px-1.5 py-0.5 rounded">
                                                                     diff: {file.similarity}
                                                                 </div>
                                                             )}
                                                         </div>
                                                         <div className="p-2">
-                                                            <p className="text-xs truncate font-medium" title={file.path}>
+                                                            <p className="text-xs truncate font-medium text-text-main" title={file.path}>
                                                                 {file.path.split("/").pop()}
                                                             </p>
-                                                            <p className="text-[10px] text-slate-500">
+                                                            <p className="text-[10px] text-text-muted">
                                                                 {formatBytes(file.size)}
                                                                 {file.width && file.height && ` • ${file.width}×${file.height}`}
                                                             </p>
@@ -795,17 +795,9 @@ export function Clean() {
                         )}
 
                         {!similarResults && !isScanning && (
-                            <div className="text-center py-12 text-slate-500">
+                            <div className="text-center py-12 text-text-muted">
                                 <Images className="w-12 h-12 mx-auto mb-4 opacity-50" />
                                 <p>Click "Find Similar" to scan for visually similar images</p>
-                                <p className="text-xs mt-2 text-slate-600">
-                                    This is for review only — burst shots may be flagged
-                                </p>
-                                {!czkawkaStatus?.includes("found") && (
-                                    <p className="text-yellow-500 mt-2">
-                                        ⚠️ czkawka_cli is required. Install it first.
-                                    </p>
-                                )}
                             </div>
                         )}
                     </div>

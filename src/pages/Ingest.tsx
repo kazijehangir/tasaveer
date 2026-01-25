@@ -414,8 +414,6 @@ export function Ingest() {
           });
         } else {
           // 1. Copy to Staging
-
-          // 1. Copy to Staging
           setStatus('copying');
           const stagingPath = `${destPath}/staging`; // Or custom logic
           addToLogs(`Copying files to staging: ${stagingPath}...`);
@@ -427,10 +425,6 @@ export function Ingest() {
           setStatus('tagging');
           addToLogs('Applying tags to staged files...');
 
-          // Use the scannedFiles state but re-map paths to staging?
-          // Actually, we can just run apply logic based on the TAGS we have.
-          // We need to find files in STAGING that match our tags.
-          // Option: Rescan staging to get exact file paths.
           addToLogs('Scanning staging directory to apply tags...');
           const stagedFiles = await invoke<FileMetadataInfo[]>("scan_missing_dates", {
             path: stagingPath,
@@ -446,57 +440,20 @@ export function Ingest() {
             let tag = sourceTags.find((t) => t.cameraAliases.includes(model));
 
             if (!tag) {
-              // Calculate relative path in STAGING
-              // file.file_path is in stagingPath.
-              // We need relative path from stagingPath to match the relative path from sourcePath used in groupings.
-
               let fileDir = file.file_path.substring(0, file.file_path.lastIndexOf('/'));
               if (fileDir.startsWith(stagingPath)) {
                 let relDir = fileDir.substring(stagingPath.length);
                 if (relDir.startsWith('/')) relDir = relDir.substring(1);
-                // The "staging" dir structure mirrors "source" dir structure (rsync -a source/ staging/source_name/)
-                // WAIT: rsync creates a subdirectory with the source folder name inside stagingPath? 
-                // Let's check copy_to_staging implementation.
-                // "rsync -a source staging" -> if source is /a/b, and staging is /x/y, rsync makes /x/y/b/...
-                // So we need to strip the first component of the relative path to match the source relative path?
-
-                // Actually, in scanSource, we stripped sourcePath. 
-                // Example: Source=/Users/me/Photos. File=/Users/me/Photos/2023/Image.jpg. RelDir=2023.
-                // In Staging: Staging=/Tmp/Stage. rsync creates /Tmp/Stage/Photos/2023/Image.jpg.
-                // So file.file_path is /Tmp/Stage/Photos/2023/Image.jpg.
-                // We need to extract "2023".
-                // So relative path from staging is "Photos/2023".
-                // We need to strip the first component "Photos".
 
                 if (relDir) {
                   const parts = relDir.split('/');
                   if (parts.length > 0) {
-                    // The first part is the source directory name itself.
-                    // The rest is the relative path inside source.
-                    // If parts.length == 1, it means it's in the root of source dir. (e.g. "Photos"), so RelDir should be "Root"?
-                    // Re-check scanSource logic:
-                    // if RelDir empty -> "Root".
-                    // In internal relative path, it was "Relative from Source Root".
-
-                    // Here, RelDir is "SourceDirName/SubDir/..."
-                    // matches = parts.slice(1).join('/');
-                    // if (parts.length === 1) matches = "Root";
-
                     let matchPath = parts.length > 1 ? parts.slice(1).join('/') : "Root";
                     tag = sourceTags.find((t) =>
-                      (t.directoryPatterns || []).some(pattern => matchPath === pattern) // Exact match on relative path string?
-                      // Previous logic was simple string includes. Now we have full relative paths.
-                      // Let's assume user selected "2023/Trip" in dropdown. Tag pattern is "2023/Trip".
-                      // matchPath is "2023/Trip".
-                      // We should check exact match or at least "starts with"?
-                      // For now, let's use check if one includes the other or exact match.
-                      // Actually, the dropdown assigns the specific grouping key.
-                      // The grouping key IS the relative path.
-                      // So we should look for exact match of the key.
+                      (t.directoryPatterns || []).some(pattern => matchPath === pattern)
                     );
 
                     if (!tag) {
-                      // Fallback to simple inclusion check just in case
                       tag = sourceTags.find((t) =>
                         (t.directoryPatterns || []).some(pattern => matchPath.includes(pattern))
                       );
@@ -540,11 +497,7 @@ export function Ingest() {
               const threads = navigator.hardwareConcurrency || 4;
               // Source is STAGING now
               const args = [stagingPath, destPath, '--date', 'YYYY/YYYY-MM-DD', '--original-names', '--progress', '-c', threads.toString()];
-              if (selectedStrategy === 'move') args.push('--move'); // Actually we might always 'move' from staging since it's a temp copy? 
-              // If we copy, we are left with a full staging dir. If we move, Phockup deletes sourced files in staging.
-              // Let's use Move from staging to cleanup as we go, or just delete directory after.
-              // Using copy is safer if we want to debug staging. Let's stick to user pref for now but defaulted to move?
-              // Actually, copying from staging duplicates data again. Moving from staging is best.
+              if (selectedStrategy === 'move') args.push('--move');
               args.push('--move');
 
               addToLogs(`Command: ${phockupCmd} ${args.join(' ')}`);
@@ -563,7 +516,6 @@ export function Ingest() {
           await runPhockup();
 
           // 4. Cleanup Staging 
-          // setStatus('organizing'); // Keep status
           addToLogs("Cleaning up staging directory...");
           try {
             await invoke('clean_staging', { path: stagingPath });
@@ -574,11 +526,7 @@ export function Ingest() {
         } // End of tagging enabled block
 
       }
-      // Immich-Go logic remains similar but from Staging? 
-      // User likely wants similar flow: Copy Zip -> Staging -> Extract/Tag -> Immich-Go?
       else {
-        // Complex logic for zips. For now, let's defer Immich-Go tagging support or keep it basic.
-        // Fallback to original logic for non-local for now.
         addToLogs("Non-local ingest not fully unified yet.");
       }
 
@@ -654,7 +602,7 @@ export function Ingest() {
         <h1 className="text-4xl font-bold mb-2">
           <span className="gradient-text">Ingest</span> Media
         </h1>
-        <p className="text-slate-400 text-lg">
+        <p className="text-text-muted text-lg">
           Import photos and videos into your canonical archive
         </p>
       </div>
@@ -663,29 +611,29 @@ export function Ingest() {
         <div className="space-y-8">
           {/* Source Selection */}
           <div className="glass-card p-8">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">1</span>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-text-main">
+              <span className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-text-main">1</span>
               Source Type
             </h2>
 
             <div className="grid grid-cols-3 gap-3 mb-6">
               <button
                 onClick={() => { setIngestType('local'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'local' ? 'bg-purple-500/20 border-purple-500 text-purple-200' : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'local' ? 'bg-primary-50 dark:bg-purple-500/20 border-primary-500 text-primary-600 dark:text-purple-200' : 'bg-neutral-50 dark:bg-slate-800/30 border-border text-text-muted hover:border-text-muted'}`}
               >
                 <HardDrive className="w-5 h-5" />
                 <span className="text-xs font-semibold">Local</span>
               </button>
               <button
                 onClick={() => { setIngestType('google-photos'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'google-photos' ? 'bg-blue-500/20 border-blue-500 text-blue-200' : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'google-photos' ? 'bg-primary-50 dark:bg-blue-500/20 border-primary-500 text-primary-600 dark:text-blue-200' : 'bg-neutral-50 dark:bg-slate-800/30 border-border text-text-muted hover:border-text-muted'}`}
               >
                 <Image className="w-5 h-5" />
                 <span className="text-xs font-semibold">Google</span>
               </button>
               <button
                 onClick={() => { setIngestType('icloud'); setSourcePath(null); }}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'icloud' ? 'bg-blue-500/20 border-blue-500 text-blue-200' : 'bg-slate-800/30 border-slate-700 text-slate-400 hover:border-slate-600'}`}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${ingestType === 'icloud' ? 'bg-primary-50 dark:bg-blue-500/20 border-primary-500 text-primary-600 dark:text-blue-200' : 'bg-neutral-50 dark:bg-slate-800/30 border-border text-text-muted hover:border-text-muted'}`}
               >
                 <Cloud className="w-5 h-5" />
                 <span className="text-xs font-semibold">iCloud</span>
@@ -694,32 +642,32 @@ export function Ingest() {
 
             {!sourcePath ? (
               <div className="grid grid-cols-1 gap-4">
-                <button onClick={handleSelectSource} className="group flex items-center gap-4 p-6 rounded-xl bg-gradient-to-r from-slate-800/50 to-slate-800/30 border border-slate-700 hover:border-purple-500/50 transition-all hover:scale-[1.02]">
-                  <div className="p-3 rounded-lg bg-purple-500/20 group-hover:bg-purple-500/30 transition-colors">
-                    {ingestType === 'local' ? <FolderOpen className="w-6 h-6 text-purple-400" /> : <Archive className="w-6 h-6 text-purple-400" />}
+                <button onClick={handleSelectSource} className="group flex items-center gap-4 p-6 rounded-xl bg-neutral-50 dark:bg-slate-800/50 border border-border hover:border-primary-500 transition-all hover:scale-[1.02]">
+                  <div className="p-3 rounded-lg bg-primary-100 dark:bg-purple-500/20 group-hover:bg-primary-200 dark:group-hover:bg-purple-500/30 transition-colors">
+                    {ingestType === 'local' ? <FolderOpen className="w-6 h-6 text-primary-600 dark:text-purple-400" /> : <Archive className="w-6 h-6 text-primary-600 dark:text-purple-400" />}
                   </div>
                   <div className="text-left">
-                    <h3 className="font-semibold text-lg text-white">
+                    <h3 className="font-semibold text-lg text-text-main">
                       {ingestType === 'local' ? 'Browse Folder' : 'Select Takeout Folder'}
                     </h3>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-text-muted">
                       {ingestType === 'local' ? 'Select source directory' : 'Select folder containing zips'}
                     </p>
                   </div>
                 </button>
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-slate-800/50 border border-green-500/30 flex items-center justify-between">
+              <div className="p-4 rounded-xl bg-neutral-50 dark:bg-slate-800/50 border border-green-500/30 flex items-center justify-between">
                 <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="p-2 rounded-lg bg-green-500/20 text-green-400">
+                  <div className="p-2 rounded-lg bg-green-500/20 text-green-600 dark:text-green-400">
                     <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div className="truncate">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Source</p>
-                    <p className="text-sm font-medium truncate" title={sourcePath}>{sourcePath}</p>
+                    <p className="text-xs text-text-muted uppercase tracking-wider font-bold">Source</p>
+                    <p className="text-sm font-medium truncate text-text-main" title={sourcePath}>{sourcePath}</p>
                   </div>
                 </div>
-                <button onClick={() => setSourcePath(null)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
+                <button onClick={() => setSourcePath(null)} className="p-2 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded-lg text-text-muted hover:text-text-main transition-colors">
                   Change
                 </button>
               </div>
@@ -730,12 +678,12 @@ export function Ingest() {
                 <button
                   onClick={scanSource}
                   disabled={isProcessing}
-                  className="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-primary-50 dark:bg-purple-500/20 text-primary-600 dark:text-purple-300 rounded-lg hover:bg-primary-100 dark:hover:bg-purple-500/30 transition-colors flex items-center gap-2"
                 >
                   {status === 'scanning' ? <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" /> : <Search className="w-4 h-4" />}
                   Scan for Tags
                 </button>
-                {isScanned && <span className="text-sm text-green-400 self-center flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> Scanned</span>}
+                {isScanned && <span className="text-sm text-green-600 dark:text-green-400 self-center flex items-center gap-1"><CheckCircle2 className="w-4 h-4" /> Scanned</span>}
               </div>
             )}
           </div>
@@ -743,15 +691,15 @@ export function Ingest() {
           {/* Tagging Panel (Always Visible) */}
           <div className={`glass-card p-8 transition-opacity ${!enableTagging ? 'opacity-50 grayscale' : ''}`}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">2</span>
+              <h2 className="text-xl font-bold flex items-center gap-2 text-text-main">
+                <span className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-text-main">2</span>
                 Assign Tags
               </h2>
               <label className="flex items-center gap-3 cursor-pointer">
-                <span className="text-sm font-medium text-slate-300">Enable Tagging & Staging</span>
+                <span className="text-sm font-medium text-text-muted">Enable Tagging & Staging</span>
                 <div className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" checked={enableTagging} onChange={(e) => setEnableTagging(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  <div className="w-11 h-6 bg-neutral-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                 </div>
               </label>
             </div>
@@ -767,13 +715,13 @@ export function Ingest() {
                       value={newTagName}
                       onChange={(e) => setNewTagName(e.target.value)}
                       placeholder="Create new source tag..."
-                      className="flex-1 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 focus:border-purple-500 focus:outline-none text-white"
+                      className="input-field"
                       onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
                     />
                     <button
                       onClick={handleCreateTag}
                       disabled={!newTagName.trim()}
-                      className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Plus className="w-5 h-5" />
                     </button>
@@ -794,23 +742,25 @@ export function Ingest() {
                 {/* Camera Models */}
                 {cameraModels.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-slate-400 mb-2 flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-text-muted mb-2 flex items-center gap-2">
                       <Camera className="w-4 h-4" /> Camera Models
                     </h3>
                     <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                      {cameraModels.map((cm) => (
-                        <div key={cm.model} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700 text-sm">
-                          <div className="min-w-0 flex-1 mr-2">
-                            <div className="truncate font-medium" title={cm.model}>{cm.model}</div>
-                            <div className="text-xs text-slate-500">{cm.count} files</div>
+                      {cameraModels.map((group) => (
+                        <div key={group.model} className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-slate-800/50 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-text-main">{group.model}</span>
+                            <span className="text-xs text-text-muted">({group.count} files)</span>
                           </div>
                           <select
-                            value={sourceTags.find(t => t.cameraAliases.includes(cm.model))?.id || ""}
-                            onChange={(e) => handleAssignCameraToTag(cm.model, e.target.value || null)}
-                            className="w-32 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-xs focus:border-purple-500 focus:outline-none"
+                            value={sourceTags.find(t => t.name === group.assignedTag)?.id || ""}
+                            onChange={(e) => handleAssignCameraToTag(group.model, e.target.value || null)}
+                            className="bg-transparent text-text-main border-none focus:ring-0 text-xs text-right cursor-pointer"
                           >
-                            <option value="">Unassigned</option>
-                            {sourceTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            <option value="">No Tag</option>
+                            {sourceTags.map(tag => (
+                              <option key={tag.id} value={tag.id}>{tag.name}</option>
+                            ))}
                           </select>
                         </div>
                       ))}
@@ -818,223 +768,77 @@ export function Ingest() {
                   </div>
                 )}
 
-                {/* Source Directories */}
+                {/* Directory Groups */}
                 {directoryGroups.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-400 mb-2 flex items-center gap-2">
-                      <FolderTree className="w-4 h-4" /> Source Directories
+                    <h3 className="text-sm font-semibold text-text-muted mb-2 flex items-center gap-2">
+                      <FolderTree className="w-4 h-4" /> Folders
                     </h3>
                     <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                      {directoryGroups.map((dg) => (
-                        <div key={dg.directory} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700 text-sm">
-                          <div className="min-w-0 flex-1 mr-2">
-                            <div className="truncate font-medium" title={dg.directory}>{dg.directory}</div>
-                            <div className="text-xs text-slate-500">{dg.count} files</div>
+                      {directoryGroups.map((group) => (
+                        <div key={group.directory} className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-slate-800/50 text-sm">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <span className="font-medium text-text-main truncate max-w-[150px]" title={group.directory}>{group.directory}</span>
+                            <span className="text-xs text-text-muted">({group.count})</span>
                           </div>
                           <select
-                            value={sourceTags.find(t => (t.directoryPatterns || []).includes(dg.directory))?.id || ""}
-                            onChange={(e) => handleAssignDirToTag(dg.directory, e.target.value || null)}
-                            className="w-32 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-xs focus:border-purple-500 focus:outline-none"
+                            value={sourceTags.find(t => t.name === group.assignedTag)?.id || ""}
+                            onChange={(e) => handleAssignDirToTag(group.directory, e.target.value || null)}
+                            className="bg-transparent text-text-main border-none focus:ring-0 text-xs text-right cursor-pointer"
                           >
-                            <option value="">Unassigned</option>
-                            {sourceTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            <option value="">No Tag</option>
+                            {sourceTags.map(tag => (
+                              <option key={tag.id} value={tag.id}>{tag.name}</option>
+                            ))}
                           </select>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {cameraModels.length === 0 && directoryGroups.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 text-sm bg-slate-900/30 rounded-lg border border-dashed border-slate-800">
-                    {!sourcePath ? (
-                      <p>Select a source folder in Step 1 to scan for cameras and directories</p>
-                    ) : !isScanned ? (
-                      <p>Scan source to find cameras and directories</p>
-                    ) : (
-                      <p>No cameras or directories found in source</p>
-                    )}
                   </div>
                 )}
               </>
             )}
           </div>
-
-
-          {/* Destination Selection */}
-          <div className="glass-card p-8">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">3</span>
-              Select Destination
-            </h2>
-
-            {!destPath ? (
-              <button onClick={handleSelectDest} className="w-full group flex items-center gap-4 p-6 rounded-xl bg-gradient-to-r from-slate-800/50 to-slate-800/30 border border-slate-700 hover:border-blue-500/50 transition-all hover:scale-[1.02]">
-                <div className="p-3 rounded-lg bg-blue-500/20 group-hover:bg-blue-500/30 transition-colors">
-                  <FolderOpen className="w-6 h-6 text-blue-400" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-semibold text-lg text-white">Browse Folder</h3>
-                  <p className="text-sm text-slate-400">Select destination archive</p>
-                </div>
-              </button>
-            ) : (
-              <div className="p-4 rounded-xl bg-slate-800/50 border border-green-500/30 flex items-center justify-between">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="p-2 rounded-lg bg-green-500/20 text-green-400">
-                    <FolderOpen className="w-5 h-5" />
-                  </div>
-                  <div className="truncate">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Destination</p>
-                      {destPath === defaultArchivePath && (
-                        <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">Default</span>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium truncate" title={destPath}>{destPath}</p>
-                  </div>
-                </div>
-                <button onClick={() => setDestPath(null)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
-                  Change
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Import Strategy (Only for Local) */}
-          {ingestType === 'local' && (
-            <div className="glass-card p-8">
-              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">4</span>
-                Import Strategy
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setSelectedStrategy('copy')}
-                  style={selectedStrategy === 'copy' ? {
-                    backgroundColor: 'rgba(168, 85, 247, 0.1)', // purple-500/10
-                    borderColor: 'rgba(168, 85, 247, 1)',       // purple-500
-                  } : {}}
-                  className={`group relative z-10 cursor-pointer flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${selectedStrategy === 'copy'
-                    ? '' // Handled by style
-                    : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
-                    }`}
-                >
-                  <div className={`p-2 rounded-lg transition-colors ${selectedStrategy === 'copy'
-                    ? 'bg-purple-500/20'
-                    : 'bg-slate-700 group-hover:bg-slate-600'
-                    }`}>
-                    <Copy className={`w-5 h-5 ${selectedStrategy === 'copy' ? 'text-purple-400' : 'text-slate-400'
-                      }`} />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="font-semibold text-base text-white mb-1">Copy</h3>
-                    <p className="text-xs text-slate-400">
-                      Keeps original files (safe)
-                    </p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedStrategy('move')}
-                  style={selectedStrategy === 'move' ? {
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)', // blue-500/10
-                    borderColor: 'rgba(59, 130, 246, 1)',       // blue-500
-                  } : {}}
-                  className={`group relative z-10 cursor-pointer flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${selectedStrategy === 'move'
-                    ? '' // Handled by style
-                    : 'bg-slate-800/30 border-slate-700 hover:border-slate-600'
-                    }`}
-                >
-                  <div className={`p-2 rounded-lg transition-colors ${selectedStrategy === 'move'
-                    ? 'bg-blue-500/20'
-                    : 'bg-slate-700 group-hover:bg-slate-600'
-                    }`}>
-                    <Move className={`w-5 h-5 ${selectedStrategy === 'move' ? 'text-blue-400' : 'text-slate-400'
-                      }`} />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="font-semibold text-base text-white mb-1">Move</h3>
-                    <p className="text-xs text-slate-400">
-                      Deletes source (clears space)
-                    </p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {ingestType !== 'local' && (
-            <div className="glass-card p-8">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <span className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">4</span>
-                Processing
-              </h2>
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
-                <p className="text-sm text-blue-200">
-                  Google Photos/iCloud archives will be processed and extracted to the destination. Originals in the zip file will be preserved.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Status & Action */}
+        {/* Right Column: Status & Destination */}
         <div className="space-y-8">
-          <div className="glass-card p-8 h-full flex flex-col">
+          {/* Status Panel */}
+          <div className="glass-card p-8 h-fit">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">Status</h2>
-              <button
-                onClick={() => setIsLogsExpanded(!isLogsExpanded)}
-                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors flex items-center gap-2 text-xs uppercase font-bold tracking-wider"
-              >
-                {isLogsExpanded ? (
-                  <>Hide Logs <ChevronUp className="w-4 h-4" /></>
-                ) : (
-                  <>Show All <ChevronDown className="w-4 h-4" /></>
-                )}
+              <h2 className="text-xl font-bold text-text-main">Status</h2>
+              <button onClick={() => setIsLogsExpanded(!isLogsExpanded)} className="text-xs text-primary-500 hover:text-primary-600 font-medium">
+                {isLogsExpanded ? 'HIDE LOGS' : 'SHOW ALL'}
               </button>
             </div>
 
-            <div className={`bg-slate-950/50 rounded-xl font-mono text-xs border border-slate-800/50 overflow-hidden transition-all duration-300 ${isLogsExpanded ? 'flex-1 p-4 overflow-y-auto max-h-[400px]' : 'p-4'}`}>
-              {logs.length === 0 ? (
-                <div className={`flex flex-col items-center justify-center text-slate-600 ${isLogsExpanded ? 'h-full' : ''}`}>
-                  <p>Ready to ingest</p>
+            {/* Destination Selector */}
+            <div className="mb-6 p-4 rounded-xl bg-neutral-50 dark:bg-slate-800/50 border border-border">
+              <h3 className="text-sm font-semibold text-text-muted mb-2">Archive Destination</h3>
+              <div className="flex gap-2">
+                <div className="flex-1 truncate text-sm font-mono text-text-main bg-white dark:bg-black/20 p-2 rounded border border-border">
+                  {destPath || "Not selected"}
                 </div>
-              ) : (
-                isLogsExpanded ? (
-                  logs.map((log, i) => (
-                    <div key={i} className="mb-1 text-slate-300 break-all border-b border-transparent hover:border-slate-800/50">{log}</div>
-                  ))
-                ) : (
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="text-slate-300 truncate font-medium">
-                      <span className="text-slate-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
-                      {logs[logs.length - 1]}
-                    </div>
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 rounded-full bg-green-500/50 animate-pulse" />
-                    </div>
-                  </div>
-                )
-              )}
+                <button onClick={handleSelectDest} className="p-2 bg-neutral-200 dark:bg-slate-700 hover:bg-neutral-300 dark:hover:bg-slate-600 rounded text-text-main">
+                  ...
+                </button>
+              </div>
             </div>
 
+            {/* Main Action Button */}
             <button
               onClick={handleIngest}
-              disabled={!sourcePath || !destPath || isProcessing}
-              className={`btn-primary w-full mt-8 text-lg py-4 flex items-center justify-center gap-3 ${(!sourcePath || !destPath || isProcessing) ? 'opacity-50 cursor-not-allowed grayscale' : ''
+              disabled={isProcessing || !sourcePath || !destPath}
+              className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all mb-6 flex items-center justify-center gap-2
+                 ${isProcessing
+                  ? 'bg-neutral-100 dark:bg-slate-800 text-text-muted cursor-not-allowed'
+                  : 'bg-primary-600 hover:bg-primary-500 text-white shadow-primary-500/30 hover:-translate-y-0.5'
                 }`}
             >
               {isProcessing ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {status === 'copying' ? 'Copying...' :
-                    status === 'tagging' ? 'Applying Tags...' :
-                      status === 'organizing' ? 'Organizing...' :
-                        status === 'scanning' ? 'Scanning...' : 'Processing...'}
+                  <div className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full" />
+                  Processing...
                 </>
               ) : (
                 <>
@@ -1044,15 +848,75 @@ export function Ingest() {
               )}
             </button>
 
+            {/* Progress / Status Display */}
+            <div className="space-y-4">
+              {/* Steps Visualizer */}
+              <div className="relative pt-4 pb-8">
+                <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-neutral-200 dark:bg-slate-700" />
+
+                {/* Step 1 */}
+                <div className="relative flex items-center gap-4 mb-6">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['scanning'].includes(status) || isProcessing ? 'bg-primary-500 text-white' : 'bg-neutral-200 dark:bg-slate-700 text-text-muted'}`}>
+                    1
+                  </div>
+                  <div>
+                    <p className={`font-medium ${['scanning'].includes(status) ? 'text-primary-500' : 'text-text-main'}`}>Scan Source</p>
+                    {status === 'scanning' && <span className="text-xs text-primary-500 animate-pulse">Scanning...</span>}
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="relative flex items-center gap-4 mb-6">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['copying', 'tagging'].includes(status) ? 'bg-primary-500 text-white' : 'bg-neutral-200 dark:bg-slate-700 text-text-muted'}`}>
+                    2
+                  </div>
+                  <div>
+                    <p className={`font-medium ${['copying', 'tagging'].includes(status) ? 'text-primary-500' : 'text-text-main'}`}>Tag & Stage</p>
+                    {status === 'copying' && <span className="text-xs text-primary-500 animate-pulse">Copying...</span>}
+                    {status === 'tagging' && <span className="text-xs text-primary-500 animate-pulse">Tagging...</span>}
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="relative flex items-center gap-4">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['organizing'].includes(status) ? 'bg-primary-500 text-white' : 'bg-neutral-200 dark:bg-slate-700 text-text-muted'}`}>
+                    3
+                  </div>
+                  <div>
+                    <p className={`font-medium ${['organizing'].includes(status) ? 'text-primary-500' : 'text-text-main'}`}>Organize (Phockup)</p>
+                    {status === 'organizing' && <span className="text-xs text-primary-500 animate-pulse">Organizing...</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cancel Button */}
             {isProcessing && (
               <button
                 onClick={handleCancel}
-                className="btn-secondary w-full mt-4 text-lg py-4 flex items-center justify-center gap-3 border-red-500/30 hover:border-red-500/50 hover:bg-red-500/10 text-red-400 hover:text-red-300"
+                className="w-full py-2 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors text-sm font-medium"
               >
-                <XCircle className="w-5 h-5" />
-                Cancel
+                Cancel Operation
               </button>
             )}
+
+            {/* Logs Area */}
+            {(isLogsExpanded || isProcessing || logs.length > 0) && (
+              <div className={`mt-4 rounded-xl bg-black/90 p-4 font-mono text-xs text-green-400 overflow-y-auto transition-all ${isLogsExpanded ? 'h-64' : 'h-32'}`}>
+                {logs.length === 0 ? (
+                  <span className="opacity-50">Waiting for logs...</span>
+                ) : (
+                  logs.map((log, i) => (
+                    <div key={i} className="mb-1 border-b border-white/5 pb-0.5 last:border-0">
+                      <span className="opacity-50 mr-2">[{new Date().toLocaleTimeString()}]</span>
+                      {log}
+                    </div>
+                  ))
+                )}
+                <div id="log-end" />
+              </div>
+            )}
+
           </div>
         </div>
       </div>

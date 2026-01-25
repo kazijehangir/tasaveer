@@ -119,3 +119,20 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
 1.  **Error Handling**: Graceful failures for locked files or permissions.
 2.  **Bundling**: Configure `tauri.conf.json` to include `exiftool` and `immich-go`.
 3.  **CI/CD**: Github Actions for multi-platform build.
+
+### Phase 6: UI Redesign (Liquid Glass)
+1.  **Design System Foundation**:
+    -   [ ] Define "Tahoe" color palette (San Francisco Blue, Glass backgrounds) in `tailwind.config.js`.
+    -   [ ] Configure typography (Inter or System Fonts).
+    -   [ ] Create reusable "Glass" utility classes (backdrop-blur, subtle borders).
+2.  **Layout Overhaul**:
+    -   [ ] Implement Mac-style Sidebar (translucent, collapsible/resizable if needed).
+    -   [ ] Create Main Content Area with "Card" metaphors.
+3.  **Component Library**:
+    -   [ ] **Buttons**: "Liquid" gradients, distinct primary/secondary styles.
+    -   [ ] **Inputs**: Rounded corners, focus rings matching the theme.
+    -   [ ] **Feedback**: Toast notifications with glass effect.
+4.  **Dark Mode**:
+    -   [ ] Ensure full `dark:` variant support for all components.
+    -   [ ] Verify contrast ratios.
+
