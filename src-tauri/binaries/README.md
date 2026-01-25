@@ -24,14 +24,15 @@ This will fetch the latest releases for your current platform.
 
 Binaries must be named with Rust target triples for Tauri's sidecar system:
 
-| Platform | Target Triple | Binary Name |
-|----------|--------------|-------------|
-| Windows x64 | `x86_64-pc-windows-msvc` | `immich-go-x86_64-pc-windows-msvc.exe` |
-| macOS Intel | `x86_64-apple-darwin` | `immich-go-x86_64-apple-darwin` |
-| macOS Apple Silicon | `aarch64-apple-darwin` | `immich-go-aarch64-apple-darwin` |
-| Linux x64 | `x86_64-unknown-linux-gnu` | `immich-go-x86_64-unknown-linux-gnu` |
+| Platform | Target Triple | immich-go Binary | ExifTool Binary |
+|----------|--------------|------------------|-----------------|
+| Windows x64 | `x86_64-pc-windows-msvc` | `immich-go-x86_64-pc-windows-msvc.exe` | `exiftool-x86_64-pc-windows-msvc.exe` |
+| macOS Intel | `x86_64-apple-darwin` | `immich-go-x86_64-apple-darwin` | `exiftool-x86_64-apple-darwin` |
+| macOS Apple Silicon | `aarch64-apple-darwin` | `immich-go-aarch64-apple-darwin` | `exiftool-aarch64-apple-darwin` |
+| Linux x64 | `x86_64-unknown-linux-gnu` | `immich-go-x86_64-unknown-linux-gnu` | `exiftool-x86_64-unknown-linux-gnu` |
 
 ## License Notes
 
 - **immich-go**: MIT License - safe to bundle
 - **ExifTool**: GPL License - bundling may have license implications
+

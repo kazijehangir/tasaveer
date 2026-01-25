@@ -1,6 +1,7 @@
 # Ignore downloaded binaries (they're fetched by scripts)
 immich-go-*
 phockup-*
+exiftool-*
 
 # Keep the directory structure
 !.gitignore

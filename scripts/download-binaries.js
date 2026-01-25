@@ -47,6 +47,43 @@ const IMMICH_GO_MAPPINGS = {
     }
 };
 
+// ExifTool configuration
+// Windows uses standalone exe, macOS/Linux use Perl distribution
+// Downloads from SourceForge (official distribution)
+const EXIFTOOL_VERSION = '13.45';
+const EXIFTOOL_MAPPINGS = {
+    'windows': {
+        targetTriple: 'x86_64-pc-windows-msvc',
+        extension: '.exe',
+        // Windows exe is a standalone binary with bundled Perl
+        url: `https://sourceforge.net/projects/exiftool/files/exiftool-${EXIFTOOL_VERSION}_64.zip/download`,
+        extract: 'zip',
+        binaryInArchive: 'exiftool(-k).exe'
+    },
+    'darwin-x64': {
+        targetTriple: 'x86_64-apple-darwin',
+        extension: '',
+        // macOS/Linux use the Perl distribution
+        url: `https://sourceforge.net/projects/exiftool/files/Image-ExifTool-${EXIFTOOL_VERSION}.tar.gz/download`,
+        extract: 'tar.gz',
+        perlBundle: true
+    },
+    'darwin-arm64': {
+        targetTriple: 'aarch64-apple-darwin',
+        extension: '',
+        url: `https://sourceforge.net/projects/exiftool/files/Image-ExifTool-${EXIFTOOL_VERSION}.tar.gz/download`,
+        extract: 'tar.gz',
+        perlBundle: true
+    },
+    'linux-x64': {
+        targetTriple: 'x86_64-unknown-linux-gnu',
+        extension: '',
+        url: `https://sourceforge.net/projects/exiftool/files/Image-ExifTool-${EXIFTOOL_VERSION}.tar.gz/download`,
+        extract: 'tar.gz',
+        perlBundle: true
+    }
+};
+
 // Get current platform's target triple
 function getCurrentTargetTriple() {
     try {
@@ -205,6 +242,128 @@ async function downloadImmichGo(targetTriples) {
     }
 }
 
+// Get ExifTool config for a target triple
+function getExifToolConfig(targetTriple) {
+    if (targetTriple === 'x86_64-pc-windows-msvc') {
+        return EXIFTOOL_MAPPINGS['windows'];
+    }
+    if (targetTriple === 'x86_64-apple-darwin') {
+        return EXIFTOOL_MAPPINGS['darwin-x64'];
+    }
+    if (targetTriple === 'aarch64-apple-darwin') {
+        return EXIFTOOL_MAPPINGS['darwin-arm64'];
+    }
+    if (targetTriple === 'x86_64-unknown-linux-gnu') {
+        return EXIFTOOL_MAPPINGS['linux-x64'];
+    }
+    return null;
+}
+
+async function downloadExifTool(targetTriples) {
+    console.log(`📦 Downloading ExifTool v${EXIFTOOL_VERSION}...`);
+
+    for (const targetTriple of targetTriples) {
+        const config = getExifToolConfig(targetTriple);
+        if (!config) {
+            console.warn(`   ⚠ No ExifTool config for target: ${targetTriple}`);
+            continue;
+        }
+
+        const outputName = `exiftool-${config.targetTriple}${config.extension}`;
+        const outputPath = path.join(BINARIES_DIR, outputName);
+
+        // Check if already exists
+        if (fs.existsSync(outputPath)) {
+            console.log(`   ✓ ${outputName} already exists, skipping`);
+            continue;
+        }
+
+        console.log(`   ⬇ Downloading ExifTool for ${targetTriple}...`);
+
+        const archiveExt = config.extract === 'zip' ? '.zip' : '.tar.gz';
+        const archivePath = path.join(BINARIES_DIR, `exiftool-${targetTriple}${archiveExt}`);
+
+        await downloadFile(config.url, archivePath);
+
+        console.log(`   📂 Extracting...`);
+
+        const tempDir = path.join(BINARIES_DIR, '_temp_exiftool');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        try {
+            if (config.extract === 'zip') {
+                // Windows: extract and find the exe
+                if (process.platform === 'win32') {
+                    execSync(`powershell -command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`, { stdio: 'inherit' });
+                } else {
+                    execSync(`unzip -o "${archivePath}" -d "${tempDir}"`, { stdio: 'inherit' });
+                }
+
+                // Find exiftool(-k).exe and rename it
+                const files = fs.readdirSync(tempDir);
+                const exeFile = files.find(f => f.includes('exiftool') && f.endsWith('.exe'));
+                if (exeFile) {
+                    fs.copyFileSync(path.join(tempDir, exeFile), outputPath);
+                } else {
+                    throw new Error('ExifTool exe not found in archive');
+                }
+            } else {
+                // macOS/Linux: Perl distribution
+                execSync(`tar -xzf "${archivePath}" -C "${tempDir}"`, { stdio: 'inherit' });
+
+                // Find the extracted directory (Image-ExifTool-X.XX)
+                const files = fs.readdirSync(tempDir);
+                const exifToolDir = files.find(f => f.startsWith('Image-ExifTool'));
+
+                if (!exifToolDir) {
+                    throw new Error('ExifTool directory not found in archive');
+                }
+
+                const exifToolPath = path.join(tempDir, exifToolDir);
+
+                if (config.perlBundle) {
+                    // Create a self-contained directory with the Perl scripts
+                    const bundleDir = path.join(BINARIES_DIR, `exiftool-bundle-${targetTriple}`);
+                    if (fs.existsSync(bundleDir)) {
+                        fs.rmSync(bundleDir, { recursive: true, force: true });
+                    }
+                    fs.mkdirSync(bundleDir, { recursive: true });
+
+                    // Copy exiftool script and lib directory
+                    fs.copyFileSync(path.join(exifToolPath, 'exiftool'), path.join(bundleDir, 'exiftool'));
+
+                    // Copy lib directory recursively
+                    const libSrc = path.join(exifToolPath, 'lib');
+                    const libDest = path.join(bundleDir, 'lib');
+                    execSync(`cp -r "${libSrc}" "${libDest}"`, { stdio: 'inherit' });
+
+                    // Create a wrapper script
+                    const wrapperContent = `#!/bin/sh
+# ExifTool wrapper script for Tasaveer
+# This script invokes the Perl exiftool from the bundle directory
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BUNDLE_DIR="${'$'}{SCRIPT_DIR}/exiftool-bundle-${targetTriple}"
+exec perl "${'$'}{BUNDLE_DIR}/exiftool" "$@"
+`;
+                    fs.writeFileSync(outputPath, wrapperContent);
+                    fs.chmodSync(outputPath, 0o755);
+                }
+            }
+
+            console.log(`   ✓ ${outputName} ready`);
+        } finally {
+            // Cleanup
+            fs.rmSync(tempDir, { recursive: true, force: true });
+            if (fs.existsSync(archivePath)) {
+                fs.unlinkSync(archivePath);
+            }
+        }
+    }
+}
+
 async function main() {
     const downloadAll = process.argv.includes('--all');
 
@@ -219,7 +378,10 @@ async function main() {
 
     if (downloadAll) {
         console.log('📋 Mode: Download all platforms\n');
-        targetTriples = Object.values(IMMICH_GO_MAPPINGS).map(m => m.targetTriple);
+        // Get unique target triples from both mappings
+        const immichGoTriples = Object.values(IMMICH_GO_MAPPINGS).map(m => m.targetTriple);
+        const exifToolTriples = Object.values(EXIFTOOL_MAPPINGS).map(m => m.targetTriple);
+        targetTriples = [...new Set([...immichGoTriples, ...exifToolTriples])];
     } else {
         const currentTriple = getCurrentTargetTriple();
         console.log(`📋 Mode: Current platform (${currentTriple})\n`);
@@ -227,6 +389,7 @@ async function main() {
     }
 
     await downloadImmichGo(targetTriples);
+    await downloadExifTool(targetTriples);
 
     console.log('\n✅ Done!');
 }

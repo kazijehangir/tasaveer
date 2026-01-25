@@ -81,9 +81,9 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
 -   [ ] Benchmark and validate 10x+ improvement
 
 #### 2.2 ExifTool Sidecar Bundling
--   [ ] Add `binaries/exiftool` to `externalBin` in `tauri.conf.json`
--   [ ] Create download script for CI (Windows exe, macOS/Linux Perl bundle)
--   [ ] Update `capabilities/shell.json` for sidecar execution
+-   [x] Add `binaries/exiftool` to `externalBin` in `tauri.conf.json`
+-   [x] Create download script for CI (Windows exe, macOS/Linux Perl bundle)
+-   [x] Update `capabilities/shell.json` for sidecar execution
 -   [ ] Implement fallback: bundled sidecar → PATH → error with install message
 
 #### 2.3 Settings Migration to tauri-plugin-store
@@ -93,9 +93,9 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
 -   [x] Update frontend to use `@tauri-apps/plugin-store` API
 
 #### 2.4 Binary Manager Module
--   [ ] Create `src-tauri/src/binaries.rs` for unified path resolution
--   [ ] Implement `discover_binary()` for exiftool, immich-go, czkawka
--   [ ] Provide clear install instructions when binaries are missing
+-   [x] Create `src-tauri/src/binaries.rs` for unified path resolution
+-   [x] Implement `discover_binary()` for exiftool, immich-go, czkawka
+-   [x] Provide clear install instructions when binaries are missing
 
 #### 2.5 Organization Engine
 -   [ ] Create `src-tauri/src/organize.rs` module

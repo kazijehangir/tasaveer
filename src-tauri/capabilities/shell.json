@@ -25,6 +25,16 @@
                     "args": true
                 },
                 {
+                    "name": "exiftool",
+                    "cmd": "exiftool",
+                    "args": true
+                },
+                {
+                    "name": "binaries/exiftool",
+                    "sidecar": true,
+                    "args": true
+                },
+                {
                     "name": "immich-go",
                     "cmd": "immich-go",
                     "args": true
@@ -57,6 +67,16 @@
                 {
                     "name": "phockup.exe",
                     "cmd": "phockup.exe",
+                    "args": true
+                },
+                {
+                    "name": "exiftool",
+                    "cmd": "exiftool",
+                    "args": true
+                },
+                {
+                    "name": "binaries/exiftool",
+                    "sidecar": true,
                     "args": true
                 },
                 {

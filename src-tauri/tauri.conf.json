@@ -25,6 +25,7 @@
     "active": true,
     "targets": "all",
     "externalBin": [
+      "binaries/exiftool",
       "binaries/immich-go"
     ],
     "icon": [
