@@ -94,6 +94,12 @@ vi.mock('@tauri-apps/plugin-opener', () => ({
     openPath: vi.fn(() => Promise.resolve()),
 }));
 
+// Mock Tauri event API
+vi.mock('@tauri-apps/api/event', () => ({
+    listen: vi.fn(() => Promise.resolve(() => { })),
+    emit: vi.fn(() => Promise.resolve()),
+}));
+
 // Suppress console errors during tests unless explicitly needed
 const originalError = console.error;
 beforeAll(() => {

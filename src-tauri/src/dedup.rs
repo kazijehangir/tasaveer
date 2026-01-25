@@ -431,4 +431,16 @@ mod tests {
         // 0 similarity = identical, higher = more different
         assert!(result.similar_groups[0].similarity > 90.0);
     }
+
+    #[test]
+    fn test_parse_duplicate_json_invalid() {
+        let result = parse_duplicate_json("invalid json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_similar_json_invalid() {
+        let result = parse_similar_json("invalid json");
+        assert!(result.is_err());
+    }
 }

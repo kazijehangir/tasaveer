@@ -67,6 +67,7 @@ impl SharedExifToolDaemon {
     }
 
     /// Shut down the ExifTool process if running.
+    #[allow(dead_code)]
     pub fn shutdown(&self) -> Result<(), String> {
         let mut guard = self.inner.lock().map_err(|_| "Lock poisoned")?;
         *guard = None; // ExifTool's Drop impl will clean up the process

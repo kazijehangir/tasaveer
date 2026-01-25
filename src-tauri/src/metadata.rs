@@ -555,4 +555,37 @@ mod tests {
         assert_eq!(ext.date, "2024-03-20");
         assert_eq!(ext.source, "Filename");
     }
+
+    #[test]
+    fn test_extract_date_signal_pattern() {
+        // signal-2024-01-01-12-00-00.jpg
+        let result = extract_date_from_filename("signal-2024-01-01-12-00-00.jpg");
+        assert!(result.is_some());
+        let ext = result.unwrap();
+        assert_eq!(ext.date, "2024-01-01");
+        // Our generic pattern catches it but doesn't parse time strictly from "12-00-00" unless we add specific signal regex.
+        // The generic regex matches "2024-01-01"
+        assert_eq!(ext.source, "Filename");
+    }
+
+    #[test]
+    fn test_extract_date_hyphenated() {
+        let result = extract_date_from_filename("2024-12-25.jpg");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().date, "2024-12-25");
+    }
+
+    #[test]
+    fn test_extract_date_underscored() {
+        let result = extract_date_from_filename("2024_12_25.jpg");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().date, "2024-12-25");
+    }
+
+    #[test]
+    fn test_extract_date_no_separators() {
+        let result = extract_date_from_filename("20241225.jpg");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().date, "2024-12-25");
+    }
 }
