@@ -131,9 +131,24 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
 
 /// Read EXIF metadata from a file using exiftool
 #[tauri::command]
-pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
+pub fn read_exif_metadata(
+    app: tauri::AppHandle,
+    file_path: String,
+) -> Result<ExifMetadata, String> {
+    let exiftool_path = crate::binaries::Prerequisite::ExifTool
+        .discover(&app)
+        .map_err(|e| format!("Failed to find exiftool: {}", e))?;
+
+    read_exif_metadata_internal(&exiftool_path, &file_path)
+}
+
+/// Internal function to read EXIF with explicit binary path
+pub fn read_exif_metadata_internal(
+    exiftool_path: &Path,
+    file_path: &str,
+) -> Result<ExifMetadata, String> {
     // Validate path before executing command
-    let path = Path::new(&file_path);
+    let path = Path::new(file_path);
     if !path.is_file() {
         return Err(format!(
             "Path does not exist or is not a file: {}",
@@ -141,7 +156,7 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
         ));
     }
 
-    let output = Command::new("exiftool")
+    let output = Command::new(exiftool_path)
         .args([
             "-json",
             "-DateTimeOriginal",
@@ -152,7 +167,7 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
             "-Keywords",
             "-XPKeywords",
             "-Subject",
-            &file_path,
+            file_path,
         ])
         .output()
         .map_err(|e| format!("Failed to run exiftool: {}", e))?;
@@ -214,7 +229,7 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
     }
 
     Ok(ExifMetadata {
-        file_path,
+        file_path: file_path.to_string(),
         date_time_original: data
             .get("DateTimeOriginal")
             .and_then(|v| v.as_str())
@@ -241,8 +256,11 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
 
 /// Get camera model string from EXIF (Make + Model)
 #[tauri::command]
-pub fn get_camera_model(file_path: String) -> Result<Option<String>, String> {
-    match read_exif_metadata(file_path) {
+pub fn get_camera_model(
+    app: tauri::AppHandle,
+    file_path: String,
+) -> Result<Option<String>, String> {
+    match read_exif_metadata(app, file_path) {
         Ok(metadata) => match (metadata.make, metadata.model) {
             (Some(make), Some(model)) => Ok(Some(format!("{} {}", make.trim(), model.trim()))),
             (None, Some(model)) => Ok(Some(model)),
@@ -256,24 +274,38 @@ pub fn get_camera_model(file_path: String) -> Result<Option<String>, String> {
 /// Write EXIF date to file ONLY if DateTimeOriginal is missing
 #[tauri::command]
 pub fn write_exif_date_if_missing(
+    app: tauri::AppHandle,
     file_path: String,
     date: String,
     time: Option<String>,
 ) -> Result<String, String> {
+    let exiftool_path = crate::binaries::Prerequisite::ExifTool
+        .discover(&app)
+        .map_err(|e| format!("Failed to find exiftool: {}", e))?;
+
+    // First check if date already exists (re-use the path)
+    if let Ok(metadata) = read_exif_metadata_internal(&exiftool_path, &file_path) {
+        if metadata.date_time_original.is_some() {
+            return Ok("Date already exists, skipping".to_string());
+        }
+    }
+
+    write_exif_date_if_missing_internal(&exiftool_path, &file_path, &date, time)
+}
+
+pub fn write_exif_date_if_missing_internal(
+    exiftool_path: &Path,
+    file_path: &str,
+    date: &str,
+    time: Option<String>,
+) -> Result<String, String> {
     // Validate path before executing command
-    let path = Path::new(&file_path);
+    let path = Path::new(file_path);
     if !path.is_file() {
         return Err(format!(
             "Path does not exist or is not a file: {}",
             file_path
         ));
-    }
-
-    // First check if date already exists
-    if let Ok(metadata) = read_exif_metadata(file_path.clone()) {
-        if metadata.date_time_original.is_some() {
-            return Ok("Date already exists, skipping".to_string());
-        }
     }
 
     // Format the datetime for EXIF
@@ -282,12 +314,12 @@ pub fn write_exif_date_if_missing(
         None => format!("{} 12:00:00", date.replace('-', ":")),
     };
 
-    let output = Command::new("exiftool")
+    let output = Command::new(exiftool_path)
         .args([
             "-overwrite_original",
             &format!("-DateTimeOriginal={}", datetime),
             &format!("-CreateDate={}", datetime),
-            &file_path,
+            file_path,
         ])
         .output()
         .map_err(|e| format!("Failed to run exiftool: {}", e))?;
@@ -302,13 +334,29 @@ pub fn write_exif_date_if_missing(
 
 /// Write keywords/tags to EXIF, avoiding duplicates
 #[tauri::command]
-pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<String, String> {
+pub fn write_exif_keywords(
+    app: tauri::AppHandle,
+    file_path: String,
+    keywords: Vec<String>,
+) -> Result<String, String> {
+    let exiftool_path = crate::binaries::Prerequisite::ExifTool
+        .discover(&app)
+        .map_err(|e| format!("Failed to find exiftool: {}", e))?;
+
+    write_exif_keywords_internal(&exiftool_path, &file_path, keywords)
+}
+
+pub fn write_exif_keywords_internal(
+    exiftool_path: &Path,
+    file_path: &str,
+    keywords: Vec<String>,
+) -> Result<String, String> {
     if keywords.is_empty() {
         return Ok("No keywords to write".to_string());
     }
 
     // Validate path before executing command
-    let path = Path::new(&file_path);
+    let path = Path::new(file_path);
     if !path.is_file() {
         return Err(format!(
             "Path does not exist or is not a file: {}",
@@ -317,7 +365,7 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
     }
 
     // First, read existing keywords using our robust reader
-    let existing_keywords = match read_exif_metadata(file_path.clone()) {
+    let existing_keywords = match read_exif_metadata_internal(exiftool_path, file_path) {
         Ok(metadata) => metadata
             .keywords
             .into_iter()
@@ -337,7 +385,7 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
 
     let keywords_str = merged.join(", ");
 
-    let output = Command::new("exiftool")
+    let output = Command::new(exiftool_path)
         .args([
             "-overwrite_original",
             "-P", // Preserve file modification date
@@ -346,7 +394,7 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
             &format!("-Keywords={}", keywords_str),
             &format!("-Subject={}", keywords_str), // Sync XMP
             "-XPKeywords=", // Remove Windows-specific tag to avoid duplication
-            &file_path,
+            file_path,
         ])
         .output()
         .map_err(|e| format!("Failed to run exiftool: {}", e))?;
@@ -469,7 +517,10 @@ fn read_exif_with_daemon(
 
 /// Read EXIF metadata by spawning exiftool (slow fallback path).
 fn read_exif_with_command(file_path: &str) -> (bool, Option<String>) {
-    match read_exif_metadata(file_path.to_string()) {
+    // If we are falling back to command, we assume exiftool is in PATH or we just try "exiftool"
+    // In the daemon context, we might know the path, but here we are in a fallback.
+    // Ideally we should pass the resolved binary path here too, but for now "exiftool" is the best guess for system path.
+    match read_exif_metadata_internal(Path::new("exiftool"), file_path) {
         Ok(metadata) => (
             metadata.date_time_original.is_some(),
             match (metadata.make, metadata.model) {
@@ -623,7 +674,17 @@ mod tests {
     #[test]
     fn test_merge_conflicting_keywords() {
         use std::io::Write;
+        use std::path::Path;
+        use std::process::Command;
         use tempfile::tempdir;
+        use which::which;
+
+        // Skip test if exiftool is not in PATH
+        if which("exiftool").is_err() {
+            eprintln!("Skipping test_merge_conflicting_keywords: exiftool not found in PATH");
+            return;
+        }
+        let exiftool_path = Path::new("exiftool");
 
         // 1. Setup temp directory and file
         let dir = tempdir().unwrap();
@@ -662,7 +723,7 @@ mod tests {
         // IPTC:Keywords = "TagA"
         // XPKeywords = "TagB;TagC"
         // XMP:Subject = "TagD"
-        let status = Command::new("exiftool")
+        let status = Command::new(exiftool_path)
             .args([
                 "-overwrite_original",
                 "-Keywords=TagA",
@@ -675,12 +736,13 @@ mod tests {
         assert!(status.success());
 
         // 3. Call our function to write a NEW tag ("TagE") which should trigger the merge
-        let result = write_exif_keywords(path_str.clone(), vec!["TagE".to_string()]);
+        let result =
+            write_exif_keywords_internal(exiftool_path, &path_str, vec!["TagE".to_string()]);
         assert!(result.is_ok());
 
         // 4. Verify results
         // Read raw output to check fields individually
-        let output = Command::new("exiftool")
+        let output = Command::new(exiftool_path)
             .args(["-json", "-Keywords", "-XPKeywords", "-Subject", &path_str])
             .output()
             .unwrap();
