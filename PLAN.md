@@ -195,5 +195,5 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
     -   [ ] Integration tests for `run_unified_ingest` using mock file system.
     -   [ ] Test ExifTool daemon error recovery.
 4.  **Infrastructure**:
-    -   [ ] CI Coverage enforcement.
+    -   [x] CI Coverage enforcement (Frontend + Rust).
 
