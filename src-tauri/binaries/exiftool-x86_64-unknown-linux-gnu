@@ -1,0 +1,7 @@
+#!/bin/sh
+# ExifTool wrapper script for Tasaveer
+# This script invokes the Perl exiftool from the bundle directory
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BUNDLE_DIR="${SCRIPT_DIR}/exiftool-bundle-x86_64-unknown-linux-gnu"
+exec perl "${BUNDLE_DIR}/exiftool" "$@"

@@ -1,7 +1,22 @@
-# Ignore downloaded binaries (they're fetched by scripts)
-immich-go-*
-phockup-*
-exiftool-*
+# Ignore temporary and zip files
+_temp*/
+*.zip
+*.tar.gz
+
+# Keep these specific binaries and bundles
+!immich-go-x86_64-unknown-linux-gnu
+!exiftool-x86_64-unknown-linux-gnu
+!exiftool-bundle-x86_64-unknown-linux-gnu/
+
+!immich-go-aarch64-apple-darwin
+!exiftool-aarch64-apple-darwin
+!exiftool-bundle-aarch64-apple-darwin/
+
+!immich-go-x86_64-apple-darwin
+!exiftool-x86_64-apple-darwin
+
+!immich-go-x86_64-pc-windows-msvc.exe
+!exiftool-x86_64-pc-windows-msvc.exe
 
 # Keep the directory structure
 !.gitignore

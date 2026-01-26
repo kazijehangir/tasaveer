@@ -1,0 +1,5 @@
+# Sidecar binaries should always be treated as binary files
+src-tauri/binaries/immich-go-* binary
+src-tauri/binaries/exiftool-* binary
+src-tauri/binaries/exiftool-bundle-*/exiftool binary
+src-tauri/binaries/exiftool-bundle-*/lib/** binary
