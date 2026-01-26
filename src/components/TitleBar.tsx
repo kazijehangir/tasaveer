@@ -23,12 +23,10 @@ export function TitleBar() {
     >
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 via-blue-600/5 to-purple-600/5 pointer-events-none" />
-      
+
       {/* App Title */}
       <div className="relative z-10 flex items-center gap-3">
-        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-          <span className="text-xs font-bold">T</span>
-        </div>
+        <img src="/app-icon.png" alt="Tasaveer" className="w-6 h-6 rounded-lg" />
         <span className="text-sm font-semibold gradient-text">Tasaveer</span>
       </div>
 

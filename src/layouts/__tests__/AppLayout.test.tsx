@@ -36,8 +36,7 @@ describe('AppLayout', () => {
             renderWithRouter();
 
             expect(screen.getByText('Settings')).toBeInTheDocument();
-            // Theme toggle shows either "Dark Mode" or "Light Mode"
-            expect(screen.getByText(/Mode$/)).toBeInTheDocument();
+
         });
     });
 

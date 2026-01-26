@@ -19,9 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         <div className="w-64 h-screen flex flex-col bg-surface backdrop-blur-xl border-r border-border fixed left-0 top-0 z-50">
             <div className="p-6">
                 <div className="flex items-center gap-3 mb-8 px-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center text-white font-bold shadow-md shadow-primary-500/20">
-                        T
-                    </div>
+                    <img src="/app-icon.png" alt="Tasaveer" className="w-8 h-8 rounded-lg shadow-md shadow-primary-500/20" />
                     <span className="text-xl font-bold text-text-main tracking-tight">
                         Tasaveer
                     </span>
