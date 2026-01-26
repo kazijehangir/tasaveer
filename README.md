@@ -3,68 +3,51 @@
 <!-- markdownlint-disable -->
 <img align="left" width="80" height="80" hspace="20" src="public/app-icon.png">
 
-Tasaveer (/təsˌviːr/, Urdu: تصاویر, lit. 'photographs') is a media management tool which simplifies the process of importing media from various sources (like SD cards, Google Photos Takeout, and iCloud Takeout) into an organized local archive.
+Tasaveer (/t̪ə.sɑː.ˈʋiːɾ/, Urdu: تصاویر, lit. 'photographs') is a media management tool which simplifies the process of importing media from various sources (like SD cards, Google Photos Takeout, and iCloud Takeout) into an organized local archive.
 
 [![Tests](https://github.com/kazijehangir/tasaveer/actions/workflows/test.yml/badge.svg)](https://github.com/kazijehangir/tasaveer/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/kazijehangir/tasaveer/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/kazijehangir/tasaveer)
 
 ## Features
 
-- **Ingest Workflow**: Streamlined process to select source and destination paths.
+- **Ingest Workflow**: Import media from various sources (local drive, Google Photos, iCloud).
+- **Smart Tagging**: Automatically file media by camera model or directory patterns during ingest.
 - **Import Strategies**:
   - **Copy**: Safely duplicates files (keeps originals).
   - **Move**: Transfers files and clears source (saves space).
+- **Deduplication**: Visual interface for `czkawka` to find and remove duplicates.
 - **Control**: Start and cancel operations safely at any time.
-- **Monitoring**: Real-time progress logs.
 
 ## Workflow
 
-Tasaveer is designed around a 4-step workflow to ensure your media library is pristine before it reaches your permanent storage or Immich server.
+Tasaveer is designed around a 3-step workflow to ensure your media library is pristine before it reaches your permanent storage or Immich server.
 
 ![Tasaveer Home Dashboard](public/home-screenshot.png)
 
-1. **Ingest**
-    Copy over and extract images and videos from various sources like HDD backups, Google Photos Takeout, and SD cards. This step performs basic hash-based deduplication using tools like `phockup`.
+1. **Ingest & Tag**
+    Copy or move images and videos from sources like SD cards, Google Photos Takeout, or local folders. During this step, you can assign tags based on camera models or source directories to organize files automatically.
 
     ![Ingest Workflow](public/ingest-screenshot.png)
 
 2. **Clean and Dedup**
-    Extract missing metadata (e.g., dates from WhatsApp images) and perform advanced similarity-based deduplication using **Czkawka**. This step allows for stacking similar pictures and deduplicating lower-resolution copies.
+    find duplicate files and similar images using **Czkawka**. This step allows for stacking similar pictures and deduplicating lower-resolution copies.
 
-3. **Tag and Categorize**
-    Separate and organize media into logical groups (e.g., Family Shared vs. Personal Phone). The end result is a structured set of folders ready to be added as External Libraries in Immich.
-
-4. **Sync to Immich**
+3. **Sync to Immich**
     Link the organized folders as External Libraries in Immich and trigger a library scan to update your cloud archive.
+
+    ![Sync Workflow](public/sync-screenshot.png)
 
 ## Installation and Prerequisites
 
 ### Bundled Dependencies
 
-Tasaveer comes with **immich-go bundled** for Google Photos and iCloud imports. No additional installation is required for these features.
+Tasaveer comes with **immich-go** and **ExifTool** bundled for core operations. No additional installation is typically required for these.
 
-### Phockup (Required for Local Ingest)
-
-For local media ingestion (from SD cards, folders, etc.), you need to install `phockup`. This cannot be bundled due to its Python + ExifTool dependencies.
-
-> **Upstream Repository**: [ivandokov/phockup](https://github.com/ivandokov/phockup)
-
-#### MacOS
-
-The Homebrew formula for phockup is currently broken. Please use `pipx` to install it reliably:
-
-```bash
-# 1. Install pipx (if not already installed)
-brew install pipx
-pipx ensurepath
-
-# 2. Install phockup from source
-pipx install git+https://github.com/ivandokov/phockup.git
-```
-
-#### Czkawka (Required for Deduplication)
+### Czkawka (Required for Deduplication)
 
 For finding duplicate files and similar images, you need to install `czkawka_cli`.
+
+#### MacOS
 
 ```bash
 # Install via Homebrew
@@ -73,47 +56,11 @@ brew install czkawka
 
 #### Windows
 
-1. **Install Python 3** (if not already installed):
-   - Download from [python.org](https://www.python.org/downloads/windows/) or use Winget:
-
-   ```powershell
-   winget install Python.Python.3.13
-   ```
-
-2. **Install ExifTool** (required by phockup):
-
-   ```powershell
-   winget install OliverBetz.ExifTool --accept-package-agreements --accept-source-agreements
-   ```
-
-3. **Install phockup**:
-
-   ```powershell
-   # Clone phockup to your local Programs folder
-   git clone --depth 1 https://github.com/ivandokov/phockup.git "$env:LOCALAPPDATA\Programs\phockup"
-
-   # Install Python dependencies
-   pip install -r "$env:LOCALAPPDATA\Programs\phockup\requirements.txt"
-
-   # Add phockup to your PATH
-   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:LOCALAPPDATA\Programs\phockup", [EnvironmentVariableTarget]::User)
-
-   # Create a batch wrapper for easy execution
-   Set-Content -Path "$env:LOCALAPPDATA\Programs\phockup\phockup.bat" -Value '@echo off','python "%~dp0phockup.py" %*'
-   ```
-
-4. **Restart your terminal** to pick up the new PATH, then verify:
-
-   ```powershell
-   phockup --version
-   ```
+Download the `czkawka_cli` executable from [qarmin/czkawka](https://github.com/qarmin/czkawka/releases) and add it to your PATH, or specify its location in Settings.
 
 ### Custom Binary Paths
 
-You can override the bundled or PATH binaries with your own custom installations in **Settings → Advanced: Custom Binary Paths**. This is useful if you want to:
-
-- Use a specific version of immich-go
-- Point to phockup installed in a non-standard location
+You can override the bundled or PATH binaries with your own custom installations in **Settings → Advanced: Custom Binary Paths**.
 
 ![Settings Page](public/settings-screenshot.png)
 
@@ -122,9 +69,8 @@ You can override the bundled or PATH binaries with your own custom installations
 | Tool | Bundled | Repository |
 | --- | --- | --- |
 | **immich-go** | ✅ Yes | [simulot/immich-go](https://github.com/simulot/immich-go) |
+| **ExifTool** | ✅ Yes | [exiftool.org](https://exiftool.org/) |
 | **czkawka** | ❌ No | [qarmin/czkawka](https://github.com/qarmin/czkawka) |
-| **phockup** | ❌ No (requires Python) | [ivandokov/phockup](https://github.com/ivandokov/phockup) |
-| **ExifTool** | ❌ No (required by phockup) | [exiftool.org](https://exiftool.org/) |
 
 ## Developing Guide
 
