@@ -905,7 +905,7 @@ export function Ingest() {
 
                 {/* Step 1 */}
                 <div className="relative flex items-center gap-4 mb-6">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['scanning'].includes(status) || isProcessing ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-muted'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['scanning'].includes(status) || isProcessing ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-main font-bold border border-border'}`}>
                     1
                   </div>
                   <div>
@@ -916,7 +916,7 @@ export function Ingest() {
 
                 {/* Step 2 */}
                 <div className="relative flex items-center gap-4 mb-6">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['copying', 'tagging'].includes(status) ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-muted'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['copying', 'tagging'].includes(status) ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-main font-bold border border-border'}`}>
                     2
                   </div>
                   <div>
@@ -928,7 +928,7 @@ export function Ingest() {
 
                 {/* Step 3 */}
                 <div className="relative flex items-center gap-4">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['organizing'].includes(status) ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-muted'}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${['organizing'].includes(status) ? 'bg-primary-500 text-white' : 'bg-surface-secondary text-text-main font-bold border border-border'}`}>
                     3
                   </div>
                   <div>

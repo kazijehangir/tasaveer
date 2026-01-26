@@ -27,7 +27,7 @@ export function Sync() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-text-main">Immich Server</h2>
-                <p className="text-sm text-text-muted">Connection status</p>
+                <p className="text-sm text-text-main font-medium opacity-80">Connection status</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -35,14 +35,14 @@ export function Sync() {
               <span className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">Not Configured</span>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2 text-text-muted">
-              <Cloud className="w-4 h-4" />
+          <div className="flex items-center gap-4 text-sm mt-2">
+            <div className="flex items-center gap-2 text-text-main font-medium">
+              <Cloud className="w-4 h-4 text-text-muted" />
               <span>Server: Not set</span>
             </div>
             <div className="w-1 h-1 rounded-full bg-neutral-400" />
-            <div className="flex items-center gap-2 text-text-muted">
-              <Activity className="w-4 h-4" />
+            <div className="flex items-center gap-2 text-text-main font-medium">
+              <Activity className="w-4 h-4 text-text-muted" />
               <span>API: Not configured</span>
             </div>
           </div>

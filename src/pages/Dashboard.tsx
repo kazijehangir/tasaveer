@@ -33,7 +33,7 @@ export function Dashboard() {
               <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-500/20 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/30 transition-colors">
                 <Import className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <span className="text-xs font-mono text-purple-600/60 dark:text-purple-400/60 uppercase tracking-wider">Step 1</span>
+              <span className="text-xs font-mono text-purple-700 dark:text-purple-300 uppercase tracking-wider">Step 1</span>
             </div>
             <div>
               <h3 className="font-semibold text-lg text-text-main mb-1">Ingest</h3>
@@ -50,7 +50,7 @@ export function Dashboard() {
               <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-500/20 group-hover:bg-blue-200 dark:group-hover:bg-blue-500/30 transition-colors">
                 <Sparkles className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <span className="text-xs font-mono text-blue-600/60 dark:text-blue-400/60 uppercase tracking-wider">Step 2</span>
+              <span className="text-xs font-mono text-blue-700 dark:text-blue-300 uppercase tracking-wider">Step 2</span>
             </div>
             <div>
               <h3 className="font-semibold text-lg text-text-main mb-1">Clean & Dedup</h3>
@@ -67,7 +67,7 @@ export function Dashboard() {
               <div className="p-3 rounded-lg bg-pink-100 dark:bg-pink-500/20 group-hover:bg-pink-200 dark:group-hover:bg-pink-500/30 transition-colors">
                 <FolderHeart className="w-6 h-6 text-pink-600 dark:text-pink-400" />
               </div>
-              <span className="text-xs font-mono text-pink-600/60 dark:text-pink-400/60 uppercase tracking-wider">Step 3</span>
+              <span className="text-xs font-mono text-pink-700 dark:text-pink-300 uppercase tracking-wider">Step 3</span>
             </div>
             <div>
               <h3 className="font-semibold text-lg text-text-main mb-1">Tag & Categorize</h3>
@@ -84,7 +84,7 @@ export function Dashboard() {
               <div className="p-3 rounded-lg bg-green-100 dark:bg-green-500/20 group-hover:bg-green-200 dark:group-hover:bg-green-500/30 transition-colors">
                 <RefreshCw className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
-              <span className="text-xs font-mono text-green-600/60 dark:text-green-400/60 uppercase tracking-wider">Step 4</span>
+              <span className="text-xs font-mono text-green-700 dark:text-green-300 uppercase tracking-wider">Step 4</span>
             </div>
             <div>
               <h3 className="font-semibold text-lg text-text-main mb-1">Sync</h3>
@@ -97,11 +97,9 @@ export function Dashboard() {
       {/* Recent Activity */}
       <div className="glass-card p-8">
         <h2 className="text-2xl font-bold mb-6 text-text-main">Recent Activity</h2>
-        <div className="space-y-4">
-          <div className="text-center py-8 text-text-muted">
-            <p>No recent activity</p>
-            <p className="text-sm mt-2">Your import and sync history will appear here</p>
-          </div>
+        <div className="text-center py-8">
+          <p className="text-text-main font-medium">No recent activity</p>
+          <p className="text-text-muted text-sm mt-2">Your import and sync history will appear here</p>
         </div>
       </div>
 

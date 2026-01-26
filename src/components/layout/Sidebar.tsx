@@ -46,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
 
                 <div className="space-y-6">
                     <div>
-                        <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4 px-3">
+                        <div className="text-xs font-bold text-text-main uppercase tracking-widest mb-4 px-3 opacity-80">
                             Workflow
                         </div>
                         <nav className="space-y-1">

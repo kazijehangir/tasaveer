@@ -137,3 +137,30 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
     -   [ ] Ensure full `dark:` variant support for all components.
     -   [ ] Verify contrast ratios.
 
+## Accessibility & Contrast Audit (Tahoe Design System)
+
+### Identified Issues
+
+#### 1. Text Contrast Failures (Light Mode)
+*   **Muted Text (`--color-text-muted`)**: Currently uses Neutral 500 (#6B7280) on white/light backgrounds. Contrast ratio is ~3.9:1, failing the 4.5:1 requirement for normal text.
+*   **Tertiary Text (`--color-text-tertiary`)**: Currently uses Neutral 400 (#9CA3AF). Contrast ratio is ~2.1:1, significant failure.
+*   **Workflow Step Labels**: "STEP 1", "STEP 2" labels use light tinted colors (e.g., `text-purple-400`) on tinted backgrounds, resulting in poor legibility.
+*   **Empty State Text**: "No recent activity" is too faint.
+
+#### 2. Visual Hierarchy Issues (Dark Mode)
+*   **Section Headers**: Headings like "RECENT ACTIVITY" use very dark gray on a dark background.
+*   **Tertiary Text**: Contrast is too low for helper text and metadata.
+
+### Proposed Fixes
+
+#### [index.css](file:///Users/jehangir/dev/tasaveer/src/index.css) adjustments:
+*   [ ] **Light Mode**: Increase contrast for `text-muted` and `text-tertiary`.
+    *   Change `--color-text-muted` to Neutral 600 (#4B5563) or 700.
+    *   Change `--color-text-tertiary` to Neutral 500 (#6B7280).
+*   [ ] **Dark Mode**: Increase visibility of tertiary elements.
+    *   Change `--color-text-tertiary` to Neutral 400 (#9CA3AF).
+
+#### Component-specific adjustments:
+*   [ ] **Workflow Cards**: Use a bolder weight or darker shade for "STEP X" labels.
+*   [ ] **Sidebar**: Ensure section headers meet 3:1 contrast for non-text UI elements.
+
