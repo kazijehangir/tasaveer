@@ -52,6 +52,14 @@ describe('Settings', () => {
             expect(screen.getByText('System Prerequisites')).toBeInTheDocument();
         });
 
+        it('renders appearance section', async () => {
+            renderSettings();
+
+            expect(screen.getByText('Appearance')).toBeInTheDocument();
+            expect(screen.getByText('Light Mode')).toBeInTheDocument();
+            expect(screen.getByText('Dark Mode')).toBeInTheDocument();
+        });
+
         it('renders archive configuration section', async () => {
             renderSettings();
 

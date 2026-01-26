@@ -1,11 +1,23 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "../components/layout/Sidebar";
 import { useEffect, useState } from "react";
+import { useUIStore } from "../store/uiStore";
 
 export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const { theme, initTheme } = useUIStore();
+
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+  }, [theme]);
 
   // Sync route with active tab
   useEffect(() => {

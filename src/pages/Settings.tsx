@@ -1,10 +1,11 @@
-import { FolderOpen, Server, Key, Package, XCircle, CheckCircle2, Save, RefreshCw, AlertTriangle, ExternalLink } from "lucide-react";
+import { FolderOpen, Server, Key, Package, XCircle, CheckCircle2, Save, RefreshCw, AlertTriangle, ExternalLink, Sun, Moon } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Command } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { load, type Store } from "@tauri-apps/plugin-store";
+import { useUIStore } from "../store/uiStore";
 
 interface SettingsData {
   archivePath: string;
@@ -24,6 +25,7 @@ interface ValidationStatus {
 }
 
 export function Settings() {
+  const { theme, setTheme } = useUIStore();
   const [settings, setSettings] = useState<SettingsData>({
     archivePath: "",
     immichUrl: "",
@@ -247,6 +249,51 @@ export function Settings() {
         <p className="text-text-muted font-medium">
           Configure external tools and connections
         </p>
+      </div>
+
+      {/* Appearance Configuration */}
+      <div className="glass-card p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-primary-500/20">
+            <Sun className="w-5 h-5 text-primary-400" />
+          </div>
+          <h2 className="text-2xl font-bold">Appearance</h2>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-text-muted">
+              Application Theme
+            </label>
+            <p className="text-sm text-text-muted mb-4">
+              Choose between light and dark mode for the interface
+            </p>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setTheme('light')}
+                className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all
+                  ${theme === 'light'
+                    ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20 text-text-main'
+                    : 'border-border bg-surface hover:border-text-muted text-text-muted hover:text-text-main'}`}
+              >
+                <Sun className="w-5 h-5" />
+                <span className="font-semibold">Light Mode</span>
+              </button>
+
+              <button
+                onClick={() => setTheme('dark')}
+                className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all
+                  ${theme === 'dark'
+                    ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20 text-text-main'
+                    : 'border-border bg-surface hover:border-text-muted text-text-muted hover:text-text-main'}`}
+              >
+                <Moon className="w-5 h-5" />
+                <span className="font-semibold">Dark Mode</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Dependencies Section (Moved to Top) */}
