@@ -186,9 +186,9 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
 *   [ ] **Sidebar**: Ensure section headers meet 3:1 contrast for non-text UI elements.
 
 ### Phase 7: Testing & Quality
-1.  **Frontend Gaps (Focus on Logic)**:
-    -   [ ] **Ingest.tsx & Clean.tsx**: Test edge cases for unified ingest (cancellation, error states).
-    -   [ ] **Ingest.tsx**: Test metadata tagging logic (especially the new batch tagging).
+1.  **Frontend Gaps (Focus on Logic) (In Progress)**:
+    -   [x] **Ingest.tsx & Clean.tsx**: Added comprehensive tests for unified ingest, metadata fixing, and duplicate deletion.
+    -   [x] **Settings.tsx**: Added tests for theme switching, connection testing, and custom binary paths.
 2.  **UI Component Testing (Completed)**:
     -   [x] Added unit tests for `Button`, `Card`, and `Input` to ensure they handle props correctly.
 3.  **Backend (Rust) Logic Expansion**:

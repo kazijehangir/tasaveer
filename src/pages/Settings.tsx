@@ -505,7 +505,7 @@ export function Settings() {
         <div className="space-y-6">
           {/* ExifTool Path Override */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-text-muted">
+            <label htmlFor="exiftool-path" className="block text-sm font-medium text-text-muted">
               ExifTool Binary Path
             </label>
             <p className="text-sm text-text-muted mb-2 font-medium">
@@ -513,6 +513,7 @@ export function Settings() {
             </p>
             <div className="flex gap-3">
               <input
+                id="exiftool-path"
                 type="text"
                 className="input-field flex-1"
                 placeholder="e.g. /usr/local/bin/exiftool"
@@ -555,7 +556,7 @@ export function Settings() {
 
           {/* Czkawka Path Override */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-text-muted">
+            <label htmlFor="czkawka-path" className="block text-sm font-medium text-text-muted">
               Czkawka Binary Path
             </label>
             <p className="text-sm text-text-muted mb-2 font-medium">
@@ -563,6 +564,7 @@ export function Settings() {
             </p>
             <div className="flex gap-3">
               <input
+                id="czkawka-path"
                 type="text"
                 className="input-field flex-1"
                 placeholder="e.g. /usr/bin/czkawka-cli"
@@ -605,7 +607,7 @@ export function Settings() {
 
           {/* Immich-Go Path Override */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-text-muted">
+            <label htmlFor="immich-go-path" className="block text-sm font-medium text-text-muted">
               Immich-Go Binary Path
             </label>
             <p className="text-sm text-text-muted mb-2 font-medium">
@@ -613,6 +615,7 @@ export function Settings() {
             </p>
             <div className="flex gap-3">
               <input
+                id="immich-go-path"
                 type="text"
                 className="input-field flex-1"
                 placeholder="Leave empty to use bundled immich-go"

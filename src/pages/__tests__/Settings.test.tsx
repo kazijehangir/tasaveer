@@ -9,7 +9,15 @@ import { load } from '@tauri-apps/plugin-store';
 const mockLoad = vi.mocked(load);
 
 vi.mock("@tauri-apps/api/core", () => ({
-    invoke: vi.fn(() => Promise.resolve({ found: true, source: 'path', version: '1.0.0' })),
+    invoke: vi.fn((cmd) => {
+        if (cmd === 'verify_binary') {
+            return Promise.resolve({ found: true, source: 'path', version: '1.0.0' });
+        }
+        if (cmd === 'validate_immich') {
+            return Promise.resolve('Connected successfully!');
+        }
+        return Promise.resolve();
+    }),
 }));
 
 const renderSettings = () => {
@@ -166,6 +174,99 @@ describe('Settings', () => {
             // Should render without errors even with empty settings
             expect(screen.getByText('Settings')).toBeInTheDocument();
             expect(screen.getByText('Archive Configuration')).toBeInTheDocument();
+        });
+    });
+
+    describe('Appearance', () => {
+        it('allows switching themes', async () => {
+            const user = userEvent.setup();
+            renderSettings();
+
+            const darkBtn = screen.getByText('Dark Mode').closest('button')!;
+            await user.click(darkBtn);
+            expect(darkBtn).toHaveClass('border-primary-500');
+
+            const lightBtn = screen.getByText('Light Mode').closest('button')!;
+            await user.click(lightBtn);
+            expect(lightBtn).toHaveClass('border-primary-500');
+        });
+    });
+
+    describe('Immich Connection', () => {
+        it('allows testing immich connection', async () => {
+            const user = userEvent.setup();
+            const { invoke } = await import('@tauri-apps/api/core');
+            (invoke as Mock).mockImplementation((cmd) => {
+                if (cmd === 'validate_immich') return Promise.resolve('Connected successfully!');
+                if (cmd === 'verify_binary') return Promise.resolve({ found: true, source: 'path', version: '1.0.0' });
+                return Promise.resolve();
+            });
+
+            renderSettings();
+
+            await waitFor(() => expect(screen.getByDisplayValue('http://localhost:2283')).toBeInTheDocument());
+            
+            const testBtn = screen.getByText(/Test Connection/i);
+            await user.click(testBtn);
+
+            await waitFor(() => {
+                expect(screen.getByText(/Connected successfully!/i)).toBeInTheDocument();
+            });
+        });
+
+        it('shows error message if connection fails', async () => {
+            const user = userEvent.setup();
+            const { invoke } = await import('@tauri-apps/api/core');
+            (invoke as Mock).mockImplementation((cmd) => {
+                if (cmd === 'validate_immich') return Promise.reject('Network error');
+                if (cmd === 'verify_binary') return Promise.resolve({ found: true, source: 'path', version: '1.0.0' });
+                return Promise.resolve();
+            });
+
+            renderSettings();
+
+            await waitFor(() => expect(screen.getByDisplayValue('http://localhost:2283')).toBeInTheDocument());
+            
+            const testBtn = screen.getByText(/Test Connection/i);
+            await user.click(testBtn);
+
+            await waitFor(() => {
+                expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+            });
+        });
+    });
+
+    describe('Advanced Settings', () => {
+        it('renders custom binary path inputs', async () => {
+            renderSettings();
+            expect(screen.getByText('Advanced: Custom Binary Paths')).toBeInTheDocument();
+            expect(screen.getByLabelText(/ExifTool Binary Path/i)).toBeInTheDocument();
+        });
+
+        it('allows clearing a custom path', async () => {
+            const user = userEvent.setup();
+            const mockStore = {
+                get: vi.fn((key: string) => {
+                    if (key === 'exiftoolPath') return Promise.resolve('/usr/bin/exiftool');
+                    return Promise.resolve('');
+                }),
+                set: vi.fn(() => Promise.resolve()),
+                save: vi.fn(() => Promise.resolve()),
+            };
+            mockLoad.mockResolvedValue(mockStore as any);
+
+            renderSettings();
+
+            await waitFor(() => {
+                expect(screen.getByDisplayValue('/usr/bin/exiftool')).toBeInTheDocument();
+            });
+
+            const clearBtn = screen.getByTitle('Clear custom path');
+            await user.click(clearBtn);
+
+            await waitFor(() => {
+                expect(screen.queryByDisplayValue('/usr/bin/exiftool')).not.toBeInTheDocument();
+            });
         });
     });
 });

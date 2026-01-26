@@ -222,4 +222,168 @@ describe('Ingest', () => {
             });
         });
     });
+
+    describe('Tag Management', () => {
+        it('allows creating a new tag', async () => {
+            const user = userEvent.setup();
+            renderIngest();
+
+            const input = screen.getByPlaceholderText(/Create new source tag.../i);
+            await user.type(input, 'New Tag');
+            await user.click(screen.getByRole('button', { name: '' }).querySelector('svg')?.parentElement!); // The Plus button
+
+            await waitFor(() => {
+                expect(screen.getByText('New Tag')).toBeInTheDocument();
+            });
+        });
+
+        it('allows removing a tag', async () => {
+            const user = userEvent.setup();
+            
+            // Initial tags in store
+            const mockStore = {
+                get: vi.fn((key: string) => {
+                    if (key === 'sourceTags') {
+                        return Promise.resolve([{ id: 'tag1', name: 'Tag 1', color: 'bg-red-500', cameraAliases: [], directoryPatterns: [] }]);
+                    }
+                    return Promise.resolve(null);
+                }),
+                set: vi.fn(() => Promise.resolve()),
+                save: vi.fn(() => Promise.resolve()),
+            };
+            mockLoad.mockResolvedValue(mockStore as any);
+            
+            renderIngest();
+
+            await waitFor(() => {
+                expect(screen.getByText('Tag 1')).toBeInTheDocument();
+            });
+
+            const removeBtn = screen.getByTitle('Remove tag');
+            await user.click(removeBtn);
+
+            await waitFor(() => {
+                expect(screen.queryByText('Tag 1')).not.toBeInTheDocument();
+            });
+        });
+    });
+
+    describe('Scanning', () => {
+        it('calls scan_missing_dates when Scan for Tags is clicked', async () => {
+            const user = userEvent.setup();
+            mockOpen.mockResolvedValueOnce('/test/source');
+            mockInvoke.mockImplementation((cmd) => {
+                if (cmd === 'scan_missing_dates') {
+                    return Promise.resolve([
+                        { file_path: '/test/source/img1.jpg', has_date: true, extracted_date: null, camera_model: 'Canon EOS' }
+                    ]);
+                }
+                return Promise.resolve([]);
+            });
+
+            renderIngest();
+
+            await user.click(screen.getByText(/Browse Folder/i));
+            await waitFor(() => expect(screen.getByText(/Scan for Tags/i)).toBeInTheDocument());
+            
+            await user.click(screen.getByText(/Scan for Tags/i));
+
+            await waitFor(() => {
+                expect(mockInvoke).toHaveBeenCalledWith('scan_missing_dates', expect.objectContaining({
+                    path: '/test/source',
+                    operationId: 'scan_source'
+                }));
+            });
+
+            await waitFor(() => {
+                expect(screen.getByText('Canon EOS')).toBeInTheDocument();
+            });
+        });
+    });
+
+    describe('Ingest Execution', () => {
+        it('calls run_unified_ingest when Start Import is clicked', async () => {
+            const user = userEvent.setup();
+            mockOpen.mockResolvedValueOnce('/test/source');
+            mockInvoke.mockImplementation((cmd) => {
+                if (cmd === 'run_unified_ingest') {
+                    return Promise.resolve({
+                        total_files: 5,
+                        organized: 4,
+                        skipped: 1,
+                        duplicates: 0,
+                        errors: 0
+                    });
+                }
+                return Promise.resolve([]);
+            });
+
+            renderIngest();
+
+            // Set source
+            await user.click(screen.getByText(/Browse Folder/i));
+            
+            // Wait for Start Import to be enabled
+            await waitFor(() => {
+                expect(screen.getByRole('button', { name: /start import/i })).not.toBeDisabled();
+            });
+
+            await user.click(screen.getByRole('button', { name: /start import/i }));
+
+            await waitFor(() => {
+                expect(mockInvoke).toHaveBeenCalledWith('run_unified_ingest', expect.objectContaining({
+                    sourcePath: '/test/source',
+                    destPath: '/test/archive',
+                    moveFiles: false,
+                    enableTagging: true
+                }));
+            });
+
+            await waitFor(() => {
+                expect(screen.getByText(/Ingest complete/i)).toBeInTheDocument();
+                expect(screen.getByText(/Total files: 5/i)).toBeInTheDocument();
+            });
+        });
+
+        it('handles cancellation', async () => {
+            const user = userEvent.setup();
+            mockOpen.mockResolvedValueOnce('/test/source');
+            
+            // Mock run_unified_ingest to be slow/pending
+            let resolveIngest: any;
+            mockInvoke.mockImplementation((cmd) => {
+                if (cmd === 'run_unified_ingest') {
+                    return new Promise((resolve) => {
+                        resolveIngest = resolve;
+                    });
+                }
+                if (cmd === 'cancel_operation') {
+                    return Promise.resolve();
+                }
+                return Promise.resolve([]);
+            });
+
+            renderIngest();
+
+            await user.click(screen.getByText(/Browse Folder/i));
+            await waitFor(() => expect(screen.getByRole('button', { name: /start import/i })).not.toBeDisabled());
+            await user.click(screen.getByRole('button', { name: /start import/i }));
+
+            // Should show processing and cancel button
+            await waitFor(() => {
+                expect(screen.getByText(/Processing.../i)).toBeInTheDocument();
+                expect(screen.getByText(/Cancel Operation/i)).toBeInTheDocument();
+            });
+
+            await user.click(screen.getByText(/Cancel Operation/i));
+
+            await waitFor(() => {
+                expect(mockInvoke).toHaveBeenCalledWith('cancel_operation', { operationId: 'organize_ingest' });
+            });
+            
+            await waitFor(() => {
+                expect(screen.getByText(/Operation canceled by user/i)).toBeInTheDocument();
+            });
+        });
+    });
 });
