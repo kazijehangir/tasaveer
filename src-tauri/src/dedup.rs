@@ -6,6 +6,7 @@
 //! - Parse czkawka JSON output
 //! - Delete files to system Trash
 
+use crate::binaries::Prerequisite;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
@@ -58,10 +59,10 @@ pub struct SimilarResult {
 
 /// Check if czkawka_cli is available in PATH or at a custom path
 #[tauri::command]
-pub fn check_czkawka() -> Result<String, String> {
-    // Try custom path from settings first (would be passed in)
-    // For now, just check PATH
-    let output = Command::new("czkawka_cli").arg("--version").output();
+pub fn check_czkawka(app_handle: tauri::AppHandle) -> Result<String, String> {
+    // Use discovery logic
+    let czkawka_path = Prerequisite::Czkawka.discover(&app_handle)?;
+    let output = Command::new(czkawka_path).arg("--version").output();
 
     match output {
         Ok(out) if out.status.success() => {
@@ -73,7 +74,8 @@ pub fn check_czkawka() -> Result<String, String> {
             Err(format!("czkawka_cli failed: {}", stderr))
         }
         Err(_) => Err(
-            "czkawka_cli not found in PATH. Please install it or download from GitHub.".to_string(),
+            "czkawka_cli not found in PATH or bundled. Please install it or download from GitHub."
+                .to_string(),
         ),
     }
 }
@@ -95,7 +97,10 @@ pub async fn find_duplicates(
 ) -> Result<DedupResult, String> {
     use tauri::Emitter;
 
-    let czkawka = czkawka_path.unwrap_or_else(|| "czkawka_cli".to_string());
+    let czkawka = match czkawka_path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => Prerequisite::Czkawka.discover(&app_handle)?,
+    };
 
     // Create a temp file for JSON output
     let temp_dir = std::env::temp_dir();
@@ -115,7 +120,7 @@ pub async fn find_duplicates(
     let child = Command::new(&czkawka)
         .args(["dup", "-d", &path, "-C", &output_path])
         .spawn()
-        .map_err(|e| format!("Failed to spawn czkawka: {}", e))?;
+        .map_err(|e| format!("Failed to spawn {}: {}", czkawka.display(), e))?;
 
     let pid = child.id();
 
@@ -160,7 +165,10 @@ pub async fn find_similar_images(
 ) -> Result<SimilarResult, String> {
     use tauri::Emitter;
 
-    let czkawka = czkawka_path.unwrap_or_else(|| "czkawka_cli".to_string());
+    let czkawka = match czkawka_path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => Prerequisite::Czkawka.discover(&app_handle)?,
+    };
 
     let temp_dir = std::env::temp_dir();
     let output_file = temp_dir.join("tasaveer_similar_results.json");
@@ -178,7 +186,7 @@ pub async fn find_similar_images(
     let child = Command::new(&czkawka)
         .args(["image", "-d", &path, "-C", &output_path])
         .spawn()
-        .map_err(|e| format!("Failed to spawn czkawka: {}", e))?;
+        .map_err(|e| format!("Failed to spawn {}: {}", czkawka.display(), e))?;
 
     let pid = child.id();
     state

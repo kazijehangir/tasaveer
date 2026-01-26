@@ -62,6 +62,15 @@ pipx ensurepath
 pipx install git+https://github.com/ivandokov/phockup.git
 ```
 
+#### Czkawka (Required for Deduplication)
+
+For finding duplicate files and similar images, you need to install `czkawka_cli`.
+
+```bash
+# Install via Homebrew
+brew install czkawka
+```
+
 #### Windows
 
 1. **Install Python 3** (if not already installed):
@@ -113,6 +122,7 @@ You can override the bundled or PATH binaries with your own custom installations
 | Tool | Bundled | Repository |
 | --- | --- | --- |
 | **immich-go** | ✅ Yes | [simulot/immich-go](https://github.com/simulot/immich-go) |
+| **czkawka** | ❌ No | [qarmin/czkawka](https://github.com/qarmin/czkawka) |
 | **phockup** | ❌ No (requires Python) | [ivandokov/phockup](https://github.com/ivandokov/phockup) |
 | **ExifTool** | ❌ No (required by phockup) | [exiftool.org](https://exiftool.org/) |
 

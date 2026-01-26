@@ -67,6 +67,16 @@ interface SimilarResult {
     total_groups: number;
 }
 
+interface ScanProgress {
+    id: string;
+    count: number;
+}
+
+interface DedupProgress {
+    id: string;
+    status: string;
+}
+
 type TabType = "metadata" | "duplicates" | "similar";
 
 export function Clean() {
@@ -100,14 +110,14 @@ export function Clean() {
         let unlistenSimilar: () => void;
 
         async function setupListeners() {
-            unlistenScan = await listen<number>("scan-progress", (event) => {
-                setProgress(`Scanned ${event.payload} files...`);
+            unlistenScan = await listen<ScanProgress>("scan-progress", (event) => {
+                setProgress(`Scanned ${event.payload.count} files...`);
             });
-            unlistenDedup = await listen<string>("dedup-progress", (event) => {
-                setProgress(event.payload);
+            unlistenDedup = await listen<DedupProgress>("dedup-progress", (event) => {
+                setProgress(event.payload.status);
             });
-            unlistenSimilar = await listen<string>("similar-progress", (event) => {
-                setProgress(event.payload);
+            unlistenSimilar = await listen<DedupProgress>("similar-progress", (event) => {
+                setProgress(event.payload.status);
             });
         }
         setupListeners();
@@ -226,6 +236,7 @@ export function Clean() {
             const results = await invoke<DedupResult>("find_duplicates", {
                 path: archivePath,
                 czkawkaPath: null,
+                operationId: "find_duplicates",
             });
             console.log("Duplicate scan results:", results);
             setDupResults(results);
@@ -249,6 +260,7 @@ export function Clean() {
             const results = await invoke<SimilarResult>("find_similar_images", {
                 path: archivePath,
                 czkawkaPath: null,
+                operationId: "find_similar_images",
             });
             console.log("Similar scan results:", results);
             setSimilarResults(results);
