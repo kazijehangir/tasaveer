@@ -1,6 +1,5 @@
 import { FolderOpen, Server, Key, Package, XCircle, CheckCircle2, Save, RefreshCw, AlertTriangle, ExternalLink, Sun, Moon } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { Command } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -12,13 +11,16 @@ interface SettingsData {
   immichUrl: string;
   immichApiKey: string;
   // Custom binary path overrides (empty = use bundled/PATH)
-  phockupPath: string;
+  exiftoolPath: string;
   immichGoPath: string;
+  czkawkaPath: string;
 }
 
 interface ValidationStatus {
-  phockup: boolean;
-  phockupSource: 'custom' | 'path' | 'none';
+  exiftool: boolean;
+  exiftoolSource: 'custom' | 'path' | 'none';
+  czkawka: boolean;
+  czkawkaSource: 'custom' | 'path' | 'none';
   immichGo: boolean;
   immichGoSource: 'custom' | 'bundled' | 'path' | 'none';
   checking: boolean;
@@ -30,12 +32,15 @@ export function Settings() {
     archivePath: "",
     immichUrl: "",
     immichApiKey: "",
-    phockupPath: "",
+    exiftoolPath: "",
     immichGoPath: "",
+    czkawkaPath: "",
   });
   const [validation, setValidation] = useState<ValidationStatus>({
-    phockup: false,
-    phockupSource: 'none',
+    exiftool: false,
+    exiftoolSource: 'none',
+    czkawka: false,
+    czkawkaSource: 'none',
     immichGo: false,
     immichGoSource: 'none',
     checking: true,
@@ -82,94 +87,27 @@ export function Settings() {
 
   const checkPrerequisites = async () => {
     setValidation(prev => ({ ...prev, checking: true }));
-    let phockupFound = false;
-    let phockupSource: ValidationStatus['phockupSource'] = 'none';
-    let immichGoFound = false;
-    let immichGoSource: ValidationStatus['immichGoSource'] = 'none';
 
-    // Check custom path first if specified
-    if (settings.phockupPath) {
+    const check = async (name: string) => {
       try {
-        const cmd = Command.create(settings.phockupPath, ['--help']);
-        const output = await cmd.execute();
-        if (output.code === 0) {
-          phockupFound = true;
-          phockupSource = 'custom';
-        }
+        return await invoke<{ found: boolean, source: string, version: string | null }>("verify_binary", { name });
       } catch (e) {
-        console.log('Custom phockup path check failed:', e);
+        console.error(`Failed to check ${name}:`, e);
+        return { found: false, source: 'none', version: null };
       }
-    }
+    };
 
-    // Check Phockup in PATH - try multiple command variants for Windows compatibility
-    if (!phockupFound) {
-      for (const cmdName of ['phockup', 'phockup.bat', 'phockup.exe'] as const) {
-        if (phockupFound) break;
-        try {
-          const phockupCmd = Command.create(cmdName, ['--help']);
-          const output = await phockupCmd.execute();
-          if (output.code === 0) {
-            phockupFound = true;
-            phockupSource = 'path';
-          }
-        } catch (e) {
-          console.log(`Phockup check failed for ${cmdName}:`, e);
-        }
-      }
-    }
-
-    // Check custom immich-go path first if specified
-    if (settings.immichGoPath) {
-      try {
-        const cmd = Command.create(settings.immichGoPath, ['version']);
-        const output = await cmd.execute();
-        if (output.code === 0) {
-          immichGoFound = true;
-          immichGoSource = 'custom';
-        }
-      } catch (e) {
-        console.log('Custom immich-go path check failed:', e);
-      }
-    }
-
-    // Check bundled sidecar
-    if (!immichGoFound) {
-      try {
-        const sidecarCmd = Command.sidecar('binaries/immich-go', ['version']);
-        const output = await sidecarCmd.execute();
-        console.log('Bundled immich-go sidecar check:', output);
-        if (output.code === 0) {
-          immichGoFound = true;
-          immichGoSource = 'bundled';
-        }
-      } catch (e) {
-        console.log('Bundled immich-go sidecar not found:', e);
-      }
-    }
-
-    // Check Immich-Go in PATH - try multiple command variants for Windows compatibility
-    if (!immichGoFound) {
-      for (const cmdName of ['immich-go', 'immich-go.exe'] as const) {
-        if (immichGoFound) break;
-        try {
-          const immichGoCmd = Command.create(cmdName, ['version']);
-          const output = await immichGoCmd.execute();
-          console.log(`Immich-go check result for ${cmdName}:`, output);
-          if (output.code === 0) {
-            immichGoFound = true;
-            immichGoSource = 'path';
-          }
-        } catch (e) {
-          console.log(`Immich-go check failed for ${cmdName}:`, e);
-        }
-      }
-    }
+    const exiftoolRes = await check("exiftool");
+    const czkawkaRes = await check("czkawka");
+    const immichGoRes = await check("immich-go");
 
     setValidation({
-      phockup: phockupFound,
-      phockupSource,
-      immichGo: immichGoFound,
-      immichGoSource,
+      exiftool: exiftoolRes.found,
+      exiftoolSource: exiftoolRes.source as any,
+      czkawka: czkawkaRes.found,
+      czkawkaSource: czkawkaRes.source as any,
+      immichGo: immichGoRes.found,
+      immichGoSource: immichGoRes.source as any,
       checking: false,
     });
   };
@@ -316,34 +254,73 @@ export function Settings() {
         </div>
 
         <div className="space-y-4">
-          {/* Phockup Status */}
+          {/* ExifTool Status */}
           <div className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <Package className="w-5 h-5 text-yellow-400" />
+              <div className="p-2 rounded-lg bg-orange-500/20">
+                <Package className="w-5 h-5 text-orange-400" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">Phockup</h3>
+                  <h3 className="font-semibold">ExifTool</h3>
                   <button
-                    onClick={() => openUrl("https://github.com/ivandokov/phockup")}
+                    onClick={() => openUrl("https://exiftool.org/")}
+                    className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-0.5"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Website
+                  </button>
+                </div>
+                <p className="text-sm text-text-muted font-medium">Metadata read/write utility (Required)</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {validation.checking ? (
+                <span className="text-text-muted text-sm">Checking...</span>
+              ) : validation.exiftool ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <span className="text-sm text-green-500 font-medium">
+                    {validation.exiftoolSource === 'custom' ? 'Custom' : 'PATH'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5 text-red-500" />
+                  <span className="text-sm text-red-500 font-medium">Not Found</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Czkawka Status */}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <Package className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">Czkawka</h3>
+                  <button
+                    onClick={() => openUrl("https://github.com/qarmin/czkawka")}
                     className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-0.5"
                   >
                     <ExternalLink className="w-3 h-3" />
                     GitHub
                   </button>
                 </div>
-                <p className="text-sm text-text-muted font-medium">Media organization tool (requires manual install)</p>
+                <p className="text-sm text-text-muted font-medium">Duplicate file finder (Required for Dedup)</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               {validation.checking ? (
                 <span className="text-text-muted text-sm">Checking...</span>
-              ) : validation.phockup ? (
+              ) : validation.czkawka ? (
                 <>
                   <CheckCircle2 className="w-5 h-5 text-green-500" />
                   <span className="text-sm text-green-500 font-medium">
-                    {validation.phockupSource === 'custom' ? 'Custom' : 'PATH'}
+                    {validation.czkawkaSource === 'custom' ? 'Custom' : 'PATH'}
                   </span>
                 </>
               ) : (
@@ -399,16 +376,19 @@ export function Settings() {
             </div>
           </div>
 
-          {!validation.phockup && !validation.checking && (
+          {(!validation.exiftool || !validation.czkawka) && !validation.checking && (
             <div className="mt-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                Phockup is required for local media ingest. Please install it from{' '}
-                <button onClick={() => openUrl("https://github.com/ivandokov/phockup")} className="text-primary-600 dark:text-primary-400 font-medium hover:underline">
-                  GitHub
-                </button>{' '}
-                and ensure it's in your system PATH, or set a custom path in Advanced Settings below.
-              </p>
+              <div className="text-sm text-amber-800 dark:text-amber-200">
+                <p className="font-bold mb-1">Missing Dependencies:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {!validation.exiftool && <li>ExifTool is required for metadata and organization.</li>}
+                  {!validation.czkawka && <li>Czkawka-cli is required for duplicate detection.</li>}
+                </ul>
+                <p className="mt-2">
+                  Please install the missing tools or set custom paths in Advanced Settings below.
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -523,21 +503,21 @@ export function Settings() {
         </div>
 
         <div className="space-y-6">
-          {/* Phockup Path Override */}
+          {/* ExifTool Path Override */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-text-muted">
-              Phockup Binary Path
+              ExifTool Binary Path
             </label>
             <p className="text-sm text-text-muted mb-2 font-medium">
-              Leave empty to use system PATH. Set path to a custom phockup installation.
+              Leave empty to use system PATH. Set path to a custom exiftool installation.
             </p>
             <div className="flex gap-3">
               <input
                 type="text"
                 className="input-field flex-1"
-                placeholder="e.g. C:\Programs\phockup\phockup.bat"
-                value={settings.phockupPath}
-                onChange={(e) => handleChange('phockupPath', e.target.value)}
+                placeholder="e.g. /usr/local/bin/exiftool"
+                value={settings.exiftoolPath}
+                onChange={(e) => handleChange('exiftoolPath', e.target.value)}
               />
               <button
                 onClick={async () => {
@@ -545,13 +525,13 @@ export function Settings() {
                     const selected = await openDialog({
                       directory: false,
                       multiple: false,
-                      title: "Select Phockup Executable",
+                      title: "Select ExifTool Executable",
                       filters: navigator.platform.toLowerCase().includes('win')
-                        ? [{ name: 'Executables', extensions: ['exe', 'bat', 'cmd'] }]
+                        ? [{ name: 'Executables', extensions: ['exe'] }]
                         : undefined,
                     });
                     if (selected) {
-                      handleChange('phockupPath', selected as string);
+                      handleChange('exiftoolPath', selected as string);
                     }
                   } catch (err) {
                     console.error("Failed to select file", err);
@@ -561,9 +541,59 @@ export function Settings() {
               >
                 Browse
               </button>
-              {settings.phockupPath && (
+              {settings.exiftoolPath && (
                 <button
-                  onClick={() => handleChange('phockupPath', '')}
+                  onClick={() => handleChange('exiftoolPath', '')}
+                  className="btn-secondary whitespace-nowrap px-4 text-red-400 hover:text-red-300"
+                  title="Clear custom path"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Czkawka Path Override */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-text-muted">
+              Czkawka Binary Path
+            </label>
+            <p className="text-sm text-text-muted mb-2 font-medium">
+              Leave empty to use system PATH (checks for 'czkawka-cli' and 'czkawka').
+            </p>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                className="input-field flex-1"
+                placeholder="e.g. /usr/bin/czkawka-cli"
+                value={settings.czkawkaPath}
+                onChange={(e) => handleChange('czkawkaPath', e.target.value)}
+              />
+              <button
+                onClick={async () => {
+                  try {
+                    const selected = await openDialog({
+                      directory: false,
+                      multiple: false,
+                      title: "Select Czkawka Executable",
+                      filters: navigator.platform.toLowerCase().includes('win')
+                        ? [{ name: 'Executables', extensions: ['exe'] }]
+                        : undefined,
+                    });
+                    if (selected) {
+                      handleChange('czkawkaPath', selected as string);
+                    }
+                  } catch (err) {
+                    console.error("Failed to select file", err);
+                  }
+                }}
+                className="btn-secondary whitespace-nowrap px-6"
+              >
+                Browse
+              </button>
+              {settings.czkawkaPath && (
+                <button
+                  onClick={() => handleChange('czkawkaPath', '')}
                   className="btn-secondary whitespace-nowrap px-4 text-red-400 hover:text-red-300"
                   title="Clear custom path"
                 >

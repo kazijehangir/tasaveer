@@ -15,8 +15,23 @@
                     "args": true
                 },
                 {
+                    "name": "exiftool.exe",
+                    "cmd": "exiftool.exe",
+                    "args": true
+                },
+                {
                     "name": "binaries/exiftool",
                     "sidecar": true,
+                    "args": true
+                },
+                {
+                    "name": "czkawka",
+                    "cmd": "czkawka",
+                    "args": true
+                },
+                {
+                    "name": "czkawka-cli",
+                    "cmd": "czkawka-cli",
                     "args": true
                 },
                 {
@@ -45,8 +60,23 @@
                     "args": true
                 },
                 {
+                    "name": "exiftool.exe",
+                    "cmd": "exiftool.exe",
+                    "args": true
+                },
+                {
                     "name": "binaries/exiftool",
                     "sidecar": true,
+                    "args": true
+                },
+                {
+                    "name": "czkawka",
+                    "cmd": "czkawka",
+                    "args": true
+                },
+                {
+                    "name": "czkawka-cli",
+                    "cmd": "czkawka-cli",
                     "args": true
                 },
                 {

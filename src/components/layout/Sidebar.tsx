@@ -1,6 +1,5 @@
 import React from 'react';
-import { Home, Layers, Folder, HardDrive, Settings, Upload, Sun, Moon } from 'lucide-react';
-import { useUIStore } from '../../store/uiStore';
+import { Home, Layers, Folder, HardDrive, Settings, Upload } from 'lucide-react';
 
 interface SidebarProps {
     activeTab: string;
@@ -8,7 +7,6 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
-    const { theme, setTheme } = useUIStore();
     const menuItems = [
         { id: 'dashboard', label: 'Home', icon: Home },
         { id: 'ingest', label: 'Ingest', icon: HardDrive },
@@ -16,10 +14,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         { id: 'cleanup', label: 'Clean & Dedup', icon: Layers },
         { id: 'sync', label: 'Export', icon: Upload },
     ];
-
-    const toggleTheme = () => {
-        setTheme(theme === 'light' ? 'dark' : 'light');
-    };
 
     return (
         <div className="w-64 h-screen flex flex-col bg-surface backdrop-blur-xl border-r border-border fixed left-0 top-0 z-50">
@@ -75,14 +69,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                 >
                     <Settings size={18} className={activeTab === 'settings' ? 'text-primary-500' : 'text-text-muted group-hover:text-text-main'} />
                     Settings
-                </button>
-
-                <button
-                    onClick={toggleTheme}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-hover transition-all text-sm font-medium"
-                >
-                    {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-                    <span className="ml-2">{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
                 </button>
             </div>
         </div>

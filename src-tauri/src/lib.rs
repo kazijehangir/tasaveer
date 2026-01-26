@@ -9,6 +9,7 @@ mod organize;
 mod state; // Add state module
 
 use state::AppState; // Import AppState
+use tauri_plugin_shell::ShellExt;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -148,6 +149,93 @@ fn validate_immich(url: String, api_key: String) -> Result<String, String> {
     }
 }
 
+#[derive(serde::Serialize)]
+pub struct BinaryStatus {
+    pub found: bool,
+    pub path: Option<String>,
+    pub source: String,
+    pub version: Option<String>,
+}
+
+#[tauri::command]
+async fn verify_binary(app_handle: tauri::AppHandle, name: String) -> Result<BinaryStatus, String> {
+    let prerequisite = match name.as_str() {
+        "exiftool" => binaries::Prerequisite::ExifTool,
+        "immich-go" => binaries::Prerequisite::ImmichGo,
+        "czkawka" => binaries::Prerequisite::Czkawka,
+        _ => return Err(format!("Unknown prerequisite: {}", name)),
+    };
+
+    // 1. Try standard discovery (PATH or manually found)
+    match prerequisite.discover(&app_handle) {
+        Ok(path) => {
+            // Try to get version (blocking is acceptable here for short commands)
+            let arg = if name == "exiftool" {
+                "-version"
+            } else {
+                "--version"
+            };
+            let output = std::process::Command::new(&path).arg(arg).output();
+
+            let version = match output {
+                Ok(out) if out.status.success() => {
+                    Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+                }
+                _ => None,
+            };
+
+            let source = if path.to_string_lossy().contains("resources")
+                || path.to_string_lossy().contains("binaries")
+            {
+                "bundled"
+            } else {
+                "path"
+            };
+
+            Ok(BinaryStatus {
+                found: true,
+                path: Some(path.to_string_lossy().to_string()),
+                source: source.to_string(),
+                version,
+            })
+        }
+        Err(_) => {
+            // 2. Fallback: Try running as a sidecar (for bundled binaries)
+            if name == "immich-go" || name == "exiftool" {
+                if let Ok(cmd) = app_handle.shell().sidecar(&name) {
+                    let arg = if name == "exiftool" {
+                        "-ver"
+                    } else {
+                        "version"
+                    };
+
+                    // Execute async sidecar command
+                    match cmd.args([arg]).output().await {
+                        Ok(output) if output.status.success() => {
+                            let version =
+                                String::from_utf8_lossy(&output.stdout).trim().to_string();
+                            return Ok(BinaryStatus {
+                                found: true,
+                                path: None, // Sidecar path is managed by Tauri
+                                source: "bundled".to_string(),
+                                version: Some(version),
+                            });
+                        }
+                        _ => {} // Fall through to not found
+                    }
+                }
+            }
+
+            Ok(BinaryStatus {
+                found: false,
+                path: None,
+                source: "none".to_string(),
+                version: None,
+            })
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn fix_path_env() {
     use std::env;
@@ -198,6 +286,7 @@ pub fn run() {
             // Organize commands
             organize::preview_organize,
             organize::run_organize,
+            verify_binary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

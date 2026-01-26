@@ -8,6 +8,10 @@ import { load } from '@tauri-apps/plugin-store';
 // Get the mocked functions
 const mockLoad = vi.mocked(load);
 
+vi.mock("@tauri-apps/api/core", () => ({
+    invoke: vi.fn(() => Promise.resolve({ found: true, source: 'path', version: '1.0.0' })),
+}));
+
 const renderSettings = () => {
     return render(
         <MemoryRouter>
@@ -27,8 +31,9 @@ describe('Settings', () => {
                     archivePath: '/test/archive',
                     immichUrl: 'http://localhost:2283',
                     immichApiKey: 'test-api-key',
-                    phockupPath: '',
+                    exiftoolPath: '',
                     immichGoPath: '',
+                    czkawkaPath: '',
                 };
                 return Promise.resolve(data[key]);
             }),
@@ -58,6 +63,14 @@ describe('Settings', () => {
             expect(screen.getByText('Appearance')).toBeInTheDocument();
             expect(screen.getByText('Light Mode')).toBeInTheDocument();
             expect(screen.getByText('Dark Mode')).toBeInTheDocument();
+        });
+
+        it('renders dependency status cards', async () => {
+            renderSettings();
+
+            expect(screen.getByText('ExifTool')).toBeInTheDocument();
+            expect(screen.getByText('Czkawka')).toBeInTheDocument();
+            expect(screen.getByText('Immich-Go')).toBeInTheDocument();
         });
 
         it('renders archive configuration section', async () => {
