@@ -77,10 +77,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
 
             <div className="mt-auto p-4 border-t border-border">
                 <button
-                    onClick={() => { alert('Settings page placeholder'); /* TODO: Implement Settings page */ }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:text-text-main hover:bg-surface-hover transition-all text-sm font-medium mb-1"
+                    onClick={() => onTabChange('settings')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm font-medium mb-1
+                        ${activeTab === 'settings'
+                            ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                            : 'text-text-muted hover:text-text-main hover:bg-surface-hover'
+                        }`}
                 >
-                    <Settings size={18} className="text-text-muted group-hover:text-text-main" />
+                    <Settings size={18} className={activeTab === 'settings' ? 'text-primary-500' : 'text-text-muted group-hover:text-text-main'} />
                     Settings
                 </button>
 

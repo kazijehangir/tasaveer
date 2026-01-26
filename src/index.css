@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* -------------------------------------------------------------------------- */
 /*                     Tailwind v4 Theme Configuration                        */
 /* -------------------------------------------------------------------------- */
@@ -78,8 +80,8 @@
 
     /* Text */
     --color-text-main: var(--color-neutral-900);
-    --color-text-muted: var(--color-neutral-600);
-    --color-text-tertiary: var(--color-neutral-500);
+    --color-text-muted: var(--color-neutral-700);
+    --color-text-tertiary: var(--color-neutral-600);
 
     /* Borders */
     --color-border: var(--color-neutral-200);

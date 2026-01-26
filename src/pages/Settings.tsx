@@ -244,7 +244,7 @@ export function Settings() {
         <h2 className="text-3xl font-bold mb-2">
           Settings
         </h2>
-        <p className="text-text-muted">
+        <p className="text-text-muted font-medium">
           Configure external tools and connections
         </p>
       </div>
@@ -280,13 +280,13 @@ export function Settings() {
                   <h3 className="font-semibold">Phockup</h3>
                   <button
                     onClick={() => openUrl("https://github.com/ivandokov/phockup")}
-                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
+                    className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-0.5"
                   >
                     <ExternalLink className="w-3 h-3" />
                     GitHub
                   </button>
                 </div>
-                <p className="text-sm text-text-muted">Media organization tool (requires manual install)</p>
+                <p className="text-sm text-text-muted font-medium">Media organization tool (requires manual install)</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -319,13 +319,13 @@ export function Settings() {
                   <h3 className="font-semibold">Immich-Go</h3>
                   <button
                     onClick={() => openUrl("https://github.com/simulot/immich-go")}
-                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
+                    className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-0.5"
                   >
                     <ExternalLink className="w-3 h-3" />
                     GitHub
                   </button>
                 </div>
-                <p className="text-sm text-text-muted">
+                <p className="text-sm text-text-muted font-medium">
                   {validation.immichGoSource === 'bundled'
                     ? 'Bundled with app (ready to use)'
                     : 'Immich upload utility'}
@@ -355,9 +355,9 @@ export function Settings() {
           {!validation.phockup && !validation.checking && (
             <div className="mt-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-yellow-200">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
                 Phockup is required for local media ingest. Please install it from{' '}
-                <button onClick={() => openUrl("https://github.com/ivandokov/phockup")} className="text-blue-400 hover:underline">
+                <button onClick={() => openUrl("https://github.com/ivandokov/phockup")} className="text-primary-600 dark:text-primary-400 font-medium hover:underline">
                   GitHub
                 </button>{' '}
                 and ensure it's in your system PATH, or set a custom path in Advanced Settings below.
@@ -381,7 +381,7 @@ export function Settings() {
             <label className="block text-sm font-medium text-text-muted">
               Canonical Archive Path
             </label>
-            <p className="text-xs text-text-tertiary mb-2">
+            <p className="text-sm text-text-muted mb-2">
               The master folder where your organized media will be stored
             </p>
             <div className="flex gap-3">
@@ -439,7 +439,7 @@ export function Settings() {
                 onChange={(e) => handleChange('immichApiKey', e.target.value)}
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <Key className="w-5 h-5 text-slate-500" />
+                <Key className="w-5 h-5 text-text-tertiary" />
               </div>
             </div>
           </div>
@@ -481,7 +481,7 @@ export function Settings() {
             <label className="block text-sm font-medium text-text-muted">
               Phockup Binary Path
             </label>
-            <p className="text-xs text-text-tertiary mb-2">
+            <p className="text-sm text-text-muted mb-2 font-medium">
               Leave empty to use system PATH. Set path to a custom phockup installation.
             </p>
             <div className="flex gap-3">
@@ -531,7 +531,7 @@ export function Settings() {
             <label className="block text-sm font-medium text-text-muted">
               Immich-Go Binary Path
             </label>
-            <p className="text-xs text-text-tertiary mb-2">
+            <p className="text-sm text-text-muted mb-2 font-medium">
               Leave empty to use bundled version. Set path to override with custom installation.
             </p>
             <div className="flex gap-3">

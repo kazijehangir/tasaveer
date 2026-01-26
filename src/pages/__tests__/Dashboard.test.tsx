@@ -1,12 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { Dashboard } from '../Dashboard';
-import { vi } from 'vitest';
-
-// Mock Settings component since it's used in Dashboard
-vi.mock('../Settings', () => ({
-    Settings: () => <div data-testid="settings-component">Settings Component</div>,
-}));
 
 describe('Dashboard', () => {
     const renderDashboard = () => {
@@ -47,8 +41,4 @@ describe('Dashboard', () => {
         expect(syncLink).toHaveAttribute('href', '/sync');
     });
 
-    it('renders settings component', () => {
-        renderDashboard();
-        expect(screen.getByTestId('settings-component')).toBeInTheDocument();
-    });
 });

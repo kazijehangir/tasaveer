@@ -15,12 +15,14 @@ export function AppLayout() {
     else if (path === "/organize") setActiveTab("organize");
     else if (path === "/clean") setActiveTab("cleanup");
     else if (path === "/sync") setActiveTab("sync");
+    else if (path === "/settings") setActiveTab("settings");
   }, [location.pathname]);
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "dashboard") navigate("/");
     else if (tabId === "cleanup") navigate("/clean");
+    else if (tabId === "settings") navigate("/settings");
     else navigate(`/${tabId}`);
   };
 

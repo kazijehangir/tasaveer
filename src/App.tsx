@@ -5,6 +5,7 @@ import { Ingest } from "./pages/Ingest";
 import { Sync } from "./pages/Sync";
 import { Clean } from "./pages/Clean";
 import { Organize } from "./pages/Organize";
+import { Settings } from "./pages/Settings";
 
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
           <Route path="clean" element={<Clean />} />
           <Route path="organize" element={<Organize />} />
           <Route path="sync" element={<Sync />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

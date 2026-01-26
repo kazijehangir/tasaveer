@@ -1,6 +1,5 @@
 import { Import, RefreshCw, Sparkles, FolderHeart } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Settings } from "./Settings";
 
 export function Dashboard() {
   return (
@@ -101,11 +100,6 @@ export function Dashboard() {
           <p className="text-text-main font-medium">No recent activity</p>
           <p className="text-text-muted text-sm mt-2">Your import and sync history will appear here</p>
         </div>
-      </div>
-
-      {/* Settings Section */}
-      <div className="pt-8 border-t border-border">
-        <Settings />
       </div>
     </div>
   );
