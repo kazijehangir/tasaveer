@@ -278,6 +278,7 @@ pub fn run() {
             metadata::write_exif_date_if_missing,
             metadata::write_exif_keywords,
             metadata::scan_missing_dates,
+            metadata::apply_tags_to_directory,
             // Dedup commands
             dedup::check_czkawka,
             dedup::find_duplicates,
@@ -286,6 +287,7 @@ pub fn run() {
             // Organize commands
             organize::preview_organize,
             organize::run_organize,
+            organize::run_unified_ingest,
             verify_binary,
         ])
         .run(tauri::generate_context!())

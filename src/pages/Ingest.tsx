@@ -2,6 +2,7 @@ import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, Image, Cloud, 
 import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { load } from "@tauri-apps/plugin-store";
 
 // Types for source tagging
@@ -53,6 +54,13 @@ interface OrganizePreview {
   will_organize: number;
   will_skip: number;
   duplicates: number;
+}
+
+interface TagProgress {
+  id: string;
+  current: number;
+  total: number;
+  message: string;
 }
 
 // Predefined colors for tags
@@ -107,6 +115,16 @@ export function Ingest() {
 
   // Helper to check if any operation is in progress
   const isProcessing = ['scanning', 'previewing', 'copying', 'tagging', 'organizing'].includes(status);
+
+  useEffect(() => {
+    const unlisten = listen<TagProgress>('tag-progress', (event) => {
+      if (event.payload.id === 'tag_staged_files') {
+        const { current, total, message } = event.payload;
+        addToLogs(`[Tagging ${current}/${total}] ${message}`);
+      }
+    });
+    return () => { unlisten.then(f => f()); };
+  }, []);
 
   // Flush logs periodically to avoid React render thrashing
   useEffect(() => {
@@ -426,137 +444,36 @@ export function Ingest() {
 
     try {
       if (ingestType === 'local') {
-        // MULTI-STEP WORKFLOW
+        setStatus('organizing');
+        addToLogs('Starting unified ingest...');
+        addToLogs(`Source: ${sourcePath}`);
+        addToLogs(`Destination: ${destPath}`);
+        addToLogs(`Strategy: ${selectedStrategy}`);
+        addToLogs(`Tagging: ${enableTagging ? 'Enabled' : 'Disabled'}`);
 
-        // If tagging is disabled, skip staging and tagging -> Run organize directly on source
-        if (!enableTagging) {
-          setStatus('organizing');
-          addToLogs('Tagging skipped. Organizing files directly from source...');
-          addToLogs(`Source: ${sourcePath}`);
-          addToLogs(`Destination: ${destPath}`);
-          addToLogs(`Strategy: ${selectedStrategy}`);
+        const rules = sourceTags.map(tag => ({
+          name: tag.name,
+          camera_models: tag.cameraAliases,
+          directory_patterns: tag.directoryPatterns || []
+        }));
 
-          const result = await invoke<OrganizeResult>('run_organize', {
-            sourcePath,
-            destPath,
-            operationId: 'organize_ingest',
-            moveFiles: selectedStrategy === 'move',
-          });
+        const result = await invoke<OrganizeResult>('run_unified_ingest', {
+          sourcePath,
+          destPath,
+          rules,
+          moveFiles: selectedStrategy === 'move',
+          enableTagging,
+          operationId: 'organize_ingest',
+        });
 
-          addToLogs(`Organization complete:`);
-          addToLogs(`  - Total files: ${result.total_files}`);
-          addToLogs(`  - Organized: ${result.organized}`);
-          addToLogs(`  - Skipped (no date): ${result.skipped}`);
-          addToLogs(`  - Duplicates: ${result.duplicates}`);
-          if (result.errors > 0) {
-            addToLogs(`  - Errors: ${result.errors}`);
-          }
-        } else {
-          // 1. Copy to Staging
-          setStatus('copying');
-          const stagingPath = `${destPath}/staging`; // Or custom logic
-          addToLogs(`Copying files to staging: ${stagingPath}...`);
-
-          await invoke('copy_to_staging', { source: sourcePath, staging: stagingPath });
-          addToLogs('Copy completed.');
-
-          // 2. Tag Files in Staging
-          setStatus('tagging');
-          addToLogs('Applying tags to staged files...');
-
-          addToLogs('Scanning staging directory to apply tags...');
-          const stagedFiles = await invoke<FileMetadataInfo[]>("scan_missing_dates", {
-            path: stagingPath,
-            operationId: "scan_staging",
-          });
-
-          let taggedCount = 0;
-          for (const file of stagedFiles) {
-            if (cancelledRef.current) throw new Error("Cancelled");
-
-            // Match logic
-            const model = file.camera_model || "Unknown";
-            let tag = sourceTags.find((t) => t.cameraAliases.includes(model));
-
-            if (!tag) {
-              let fileDir = file.file_path.substring(0, file.file_path.lastIndexOf('/'));
-              if (fileDir.startsWith(stagingPath)) {
-                let relDir = fileDir.substring(stagingPath.length);
-                if (relDir.startsWith('/')) relDir = relDir.substring(1);
-
-                if (relDir) {
-                  const parts = relDir.split('/');
-                  if (parts.length > 0) {
-                    let matchPath = parts.length > 1 ? parts.slice(1).join('/') : "Root";
-                    tag = sourceTags.find((t) =>
-                      (t.directoryPatterns || []).some(pattern => matchPath === pattern)
-                    );
-
-                    if (!tag) {
-                      tag = sourceTags.find((t) =>
-                        (t.directoryPatterns || []).some(pattern => matchPath.includes(pattern))
-                      );
-                    }
-                  }
-                }
-              }
-            }
-
-            // Original fallback if relative path logic fails or is mismatched
-            if (!tag) {
-              const parts = file.file_path.split("/");
-              const parentDir = parts.length > 1 ? parts[parts.length - 2] : "Root";
-              tag = sourceTags.find((t) =>
-                (t.directoryPatterns || []).some(pattern => parentDir.includes(pattern))
-              );
-            }
-
-            if (tag) {
-              try {
-                await invoke("write_exif_keywords", {
-                  filePath: file.file_path,
-                  keywords: [tag.name],
-                });
-                taggedCount++;
-              } catch (e) {
-                addToLogs(`Failed to tag ${file.file_path}: ${e}`);
-              }
-            }
-          }
-          addToLogs(`Tagged ${taggedCount} files.`);
-
-          // 3. Organize Staging -> Dest
-          setStatus('organizing');
-          addToLogs(`Organizing files from staging to destination...`);
-          addToLogs(`Source: ${stagingPath}`);
-          addToLogs(`Destination: ${destPath}`);
-
-          const result = await invoke<OrganizeResult>('run_organize', {
-            sourcePath: stagingPath,
-            destPath,
-            operationId: 'organize_ingest',
-            moveFiles: true, // Always move from staging
-          });
-
-          addToLogs(`Organization complete:`);
-          addToLogs(`  - Total files: ${result.total_files}`);
-          addToLogs(`  - Organized: ${result.organized}`);
-          addToLogs(`  - Skipped (no date): ${result.skipped}`);
-          addToLogs(`  - Duplicates: ${result.duplicates}`);
-          if (result.errors > 0) {
-            addToLogs(`  - Errors: ${result.errors}`);
-          }
-
-          // 4. Cleanup Staging 
-          addToLogs("Cleaning up staging directory...");
-          try {
-            await invoke('clean_staging', { path: stagingPath });
-            addToLogs("Staging directory cleaned.");
-          } catch (e) {
-            addToLogs(`Warning: Failed to clean staging path: ${e}`);
-          }
-        } // End of tagging enabled block
-
+        addToLogs(`Ingest complete:`);
+        addToLogs(`  - Total files: ${result.total_files}`);
+        addToLogs(`  - Organized: ${result.organized}`);
+        addToLogs(`  - Skipped (no date): ${result.skipped}`);
+        addToLogs(`  - Duplicates: ${result.duplicates}`);
+        if (result.errors > 0) {
+          addToLogs(`  - Errors: ${result.errors}`);
+        }
       }
       else {
         addToLogs("Non-local ingest not fully unified yet.");

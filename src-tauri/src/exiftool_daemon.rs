@@ -8,6 +8,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 /// Thread-safe wrapper around ExifTool for use in async contexts.
+#[derive(Clone)]
 pub struct SharedExifToolDaemon {
     inner: Arc<Mutex<Option<ExifTool>>>,
 }

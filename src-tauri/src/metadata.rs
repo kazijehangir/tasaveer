@@ -129,6 +129,17 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     None
 }
 
+/// Helper to format EXIF date (YYYY:MM:DD HH:MM:SS) into YYYY-MM-DD
+pub fn format_exif_date(date_str: &str) -> Option<String> {
+    if date_str.len() >= 10 {
+        let parts: Vec<&str> = date_str.split(&[' ', ':'][..]).collect();
+        if parts.len() >= 3 {
+            return Some(format!("{}-{}-{}", parts[0], parts[1], parts[2]));
+        }
+    }
+    None
+}
+
 /// Read EXIF metadata from a file using exiftool
 #[tauri::command]
 pub fn read_exif_metadata(
@@ -269,6 +280,167 @@ pub fn get_camera_model(
         },
         Err(_) => Ok(None), // No EXIF data is not an error for this function
     }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct TagRule {
+    pub name: String,
+    pub camera_models: Vec<String>,
+    pub directory_patterns: Vec<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct TagProgress {
+    id: String,
+    current: usize,
+    total: usize,
+    message: String,
+}
+
+/// Apply tags to files in a directory based on camera models and directory patterns.
+/// Groups files by tag to minimize ExifTool process spawns.
+#[tauri::command]
+pub async fn apply_tags_to_directory(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, crate::state::AppState>,
+    path: String,
+    rules: Vec<TagRule>,
+    operation_id: String,
+) -> Result<usize, String> {
+    use std::collections::HashMap;
+    use std::sync::atomic::Ordering;
+    use tauri::Emitter;
+    use walkdir::WalkDir;
+
+    let cancel_token = state.register_token(&operation_id);
+    let exiftool_path = crate::binaries::Prerequisite::ExifTool
+        .discover(&app_handle)
+        .map_err(|e| format!("Failed to find exiftool: {}", e))?;
+
+    // 1. Scan and match files to tags
+    let mut tag_groups: HashMap<String, Vec<String>> = HashMap::new();
+    let mut total_found = 0;
+
+    let walker = WalkDir::new(&path).follow_links(true);
+    let daemon_available = state.exiftool_daemon.ensure_started(None).is_ok();
+
+    for entry in walker.into_iter().filter_map(|e| e.ok()) {
+        if cancel_token.load(Ordering::Relaxed) {
+            state.remove_token(&operation_id);
+            return Err("Operation cancelled".to_string());
+        }
+
+        let file_path = entry.path();
+        if file_path.is_dir() {
+            continue;
+        }
+
+        if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
+            if !crate::organize::MEDIA_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
+                continue;
+            }
+        } else {
+            continue;
+        }
+
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        // Get camera model
+        let (_has_date, camera_model) = if daemon_available {
+            read_exif_with_daemon(&state.exiftool_daemon, &file_path_str)
+        } else {
+            read_exif_with_command(&file_path_str)
+        };
+
+        // Get relative directory
+        let rel_dir = file_path
+            .parent()
+            .and_then(|p| p.strip_prefix(&path).ok())
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        // Match against rules
+        for rule in &rules {
+            let mut matched = false;
+
+            // Match camera
+            if let Some(model) = &camera_model {
+                if rule.camera_models.iter().any(|m| model.contains(m)) {
+                    matched = true;
+                }
+            }
+
+            // Match directory pattern
+            if !matched && !rel_dir.is_empty() {
+                if rule.directory_patterns.iter().any(|p| rel_dir.contains(p)) {
+                    matched = true;
+                }
+            }
+
+            if matched {
+                tag_groups
+                    .entry(rule.name.clone())
+                    .or_default()
+                    .push(file_path_str.clone());
+                total_found += 1;
+                break;
+            }
+        }
+    }
+
+    if total_found == 0 {
+        state.remove_token(&operation_id);
+        return Ok(0);
+    }
+
+    // 2. Apply tags in batches
+    let mut tagged_count = 0;
+    let total_tags = tag_groups.len();
+
+    for (i, (tag_name, files)) in tag_groups.into_iter().enumerate() {
+        if cancel_token.load(Ordering::Relaxed) {
+            state.remove_token(&operation_id);
+            return Err("Operation cancelled".to_string());
+        }
+
+        let _ = app_handle.emit(
+            "tag-progress",
+            TagProgress {
+                id: operation_id.clone(),
+                current: i + 1,
+                total: total_tags,
+                message: format!("Applying tag '{}' to {} files", tag_name, files.len()),
+            },
+        );
+
+        // We use -Keywords+=... to append to existing keywords
+        // We also use -Subject+=... for XMP compatibility
+        // We use -overwrite_original and -P to preserve mod date
+        // To avoid command line length limits, we'll process files in chunks of 50
+        for chunk in files.chunks(50) {
+            let mut cmd = std::process::Command::new(&exiftool_path);
+            cmd.args([
+                "-overwrite_original",
+                "-P",
+                "-sep",
+                ", ",
+                &format!("-Keywords+={}", tag_name),
+                &format!("-Subject+={}", tag_name),
+            ]);
+            cmd.args(chunk);
+
+            let output = cmd.output().map_err(|e| format!("Failed to run exiftool: {}", e))?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("[ERROR] ExifTool failed for tag {}: {}", tag_name, stderr);
+            } else {
+                tagged_count += chunk.len();
+            }
+        }
+    }
+
+    state.remove_token(&operation_id);
+    Ok(tagged_count)
 }
 
 /// Write EXIF date to file ONLY if DateTimeOriginal is missing
