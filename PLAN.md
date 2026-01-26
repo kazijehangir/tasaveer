@@ -185,3 +185,15 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
 *   [ ] **Workflow Cards**: Use a bolder weight or darker shade for "STEP X" labels.
 *   [ ] **Sidebar**: Ensure section headers meet 3:1 contrast for non-text UI elements.
 
+### Phase 7: Testing & Quality
+1.  **Frontend Gaps (Focus on Logic)**:
+    -   [ ] **Ingest.tsx & Clean.tsx**: Test edge cases for unified ingest (cancellation, error states).
+    -   [ ] **Ingest.tsx**: Test metadata tagging logic (especially the new batch tagging).
+2.  **UI Component Testing (Completed)**:
+    -   [x] Added unit tests for `Button`, `Card`, and `Input` to ensure they handle props correctly.
+3.  **Backend (Rust) Logic Expansion**:
+    -   [ ] Integration tests for `run_unified_ingest` using mock file system.
+    -   [ ] Test ExifTool daemon error recovery.
+4.  **Infrastructure**:
+    -   [ ] CI Coverage enforcement.
+
