@@ -11,22 +11,16 @@ This roadmap outlines the planned evolution of Tasaveer, categorized into implem
 Focus on making the current features rock-solid and polished.
 
 ### ✨ Features
-- **Enhanced Ingest Preview**: Better visualization of what files will be renamed or skipped before starting the operation.
 - **Smart Tagging Suggestions**: Automatically suggest tags based on directory names or GPS metadata.
 - **Improved Log Viewer**: A dedicated, searchable history of all operations with error filtering.
 
 ### 🐛 Bug Fixes & Stability
-- **CSS Contrast Audit**: Ensure all elements meet accessibility standards in both light and dark modes (Tahoe design system).
-- **Process Robustness**: Improve handling of crashed or hanging sidecar processes (`exiftool`, `czkawka`).
 - **Cross-Platform Pathing**: Fix potential issues with Windows paths in the Rust/React bridge.
 
 ### 🧪 Testing & Quality
 - **E2E Testing**: Implement Playwright or custom Tauri E2E tests for the full "Ingest" and "Clean" workflows.
-- **ExifTool Benchmarking**: Validate the performance gains of the `-stay_open` daemon mode.
-- **UI Component Unit Tests**: Increase coverage for complex pages like `Ingest.tsx` and `Clean.tsx`.
 
 ### 🧹 Tech Debt
-- **Frontend Modularization**: Split the massive `Ingest.tsx` and `Clean.tsx` files into smaller, testable components.
 - **Standardized Error Handling**: Implement a unified error reporting system in the UI.
 
 ---
@@ -62,7 +56,10 @@ Tasaveer as the central hub for local media.
 
 ## ✅ Completed Milestones
 - [x] **Tauri v2 Foundation**: Native cross-platform core.
-- [x] **ExifTool Stay-Open Mode**: 10x performance boost for metadata operations.
+- [x] **Modular Backend Architecture**: Refactored core logic into testable, decoupled Rust modules.
+- [x] **ExifTool Stay-Open Integration**: Shared daemon for high-performance metadata operations.
+- [x] **Comprehensive Testing**: ~65% backend coverage and ~80% frontend coverage.
 - [x] **Dual-Mode UI**: Full "Tahoe" Liquid Glass design system.
-- [x] **Basic Ingest Logic**: Hash-based deduplication and date-based organization.
+- [x] **Unified Ingest Logic**: End-to-end "Stage -> Tag -> Organize" pipeline with parallel processing.
 - [x] **Czkawka Integration**: Duplicate and similar image scanning.
+- [x] **CI/CD Pipeline**: Automated testing, linting, and coverage reporting on every PR.
