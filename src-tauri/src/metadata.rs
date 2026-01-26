@@ -42,6 +42,26 @@ pub struct ExifMetadata {
     pub keywords: Vec<String>,
 }
 
+impl ExifMetadata {
+    /// Get combined camera model string (Make + Model)
+    pub fn get_camera_model(&self) -> Option<String> {
+        match (&self.make, &self.model) {
+            (Some(make), Some(model)) => {
+                let m = make.trim();
+                let mo = model.trim();
+                if mo.to_lowercase().starts_with(&m.to_lowercase()) {
+                    Some(mo.to_string())
+                } else {
+                    Some(format!("{} {}", m, mo))
+                }
+            }
+            (None, Some(model)) => Some(model.trim().to_string()),
+            (Some(make), None) => Some(make.trim().to_string()),
+            (None, None) => None,
+        }
+    }
+}
+
 /// Result of date extraction from filename
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtractedDate {
@@ -231,8 +251,11 @@ pub fn read_exif_metadata_internal(
         return Err("No EXIF data found".to_string());
     }
 
-    let data = &parsed[0];
+    Ok(parse_exif_metadata(&parsed[0], file_path))
+}
 
+/// Pure function to parse ExifTool JSON output into ExifMetadata struct.
+fn parse_exif_metadata(data: &serde_json::Value, file_path: &str) -> ExifMetadata {
     // Parse keywords from both Keywords and XPKeywords
     let mut keywords = Vec::new();
     if let Some(kw) = data.get("Keywords") {
@@ -274,7 +297,7 @@ pub fn read_exif_metadata_internal(
         }
     }
 
-    Ok(ExifMetadata {
+    ExifMetadata {
         file_path: file_path.to_string(),
         date_time_original: data
             .get("DateTimeOriginal")
@@ -297,7 +320,7 @@ pub fn read_exif_metadata_internal(
             .and_then(|v| v.as_str())
             .map(|s| s.to_string()),
         keywords,
-    })
+    }
 }
 
 /// Get camera model string from EXIF (Make + Model)
@@ -307,12 +330,7 @@ pub fn get_camera_model(
     file_path: String,
 ) -> Result<Option<String>, String> {
     match read_exif_metadata(app, file_path) {
-        Ok(metadata) => match (metadata.make, metadata.model) {
-            (Some(make), Some(model)) => Ok(Some(format!("{} {}", make.trim(), model.trim()))),
-            (None, Some(model)) => Ok(Some(model)),
-            (Some(make), None) => Ok(Some(make)),
-            (None, None) => Ok(None),
-        },
+        Ok(metadata) => Ok(metadata.get_camera_model()),
         Err(_) => Ok(None), // No EXIF data is not an error for this function
     }
 }
@@ -342,26 +360,62 @@ pub async fn apply_tags_to_directory(
     rules: Vec<TagRule>,
     operation_id: String,
 ) -> Result<usize, String> {
-    use std::collections::HashMap;
     use std::sync::atomic::Ordering;
     use tauri::Emitter;
-    use walkdir::WalkDir;
 
     let cancel_token = state.register_token(&operation_id);
     let exiftool_path = crate::binaries::Prerequisite::ExifTool
         .discover(&app_handle)
         .map_err(|e| format!("Failed to find exiftool: {}", e))?;
 
+    let daemon_available = state.exiftool_daemon.ensure_started(None).is_ok();
+
+    let results = apply_tags_internal(
+        Path::new(&path),
+        &rules,
+        if daemon_available { Some(&state.exiftool_daemon) } else { None },
+        &exiftool_path,
+        |current, total, message| {
+            let _ = app_handle.emit(
+                "tag-progress",
+                TagProgress {
+                    id: operation_id.clone(),
+                    current,
+                    total,
+                    message: message.to_string(),
+                },
+            );
+        },
+        || cancel_token.load(Ordering::Relaxed),
+    );
+
+    state.remove_token(&operation_id);
+    results
+}
+
+pub fn apply_tags_internal<F, C>(
+    path: &Path,
+    rules: &[TagRule],
+    daemon: Option<&crate::exiftool_daemon::SharedExifToolDaemon>,
+    exiftool_path: &Path,
+    mut on_progress: F,
+    is_cancelled: C,
+) -> Result<usize, String>
+where
+    F: FnMut(usize, usize, &str), // current_tag, total_tags, message
+    C: Fn() -> bool,
+{
+    use std::collections::HashMap;
+    use walkdir::WalkDir;
+
     // 1. Scan and match files to tags
     let mut tag_groups: HashMap<String, Vec<String>> = HashMap::new();
     let mut total_found = 0;
 
-    let walker = WalkDir::new(&path).follow_links(true);
-    let daemon_available = state.exiftool_daemon.ensure_started(None).is_ok();
+    let walker = WalkDir::new(path).follow_links(true);
 
     for entry in walker.into_iter().filter_map(|e| e.ok()) {
-        if cancel_token.load(Ordering::Relaxed) {
-            state.remove_token(&operation_id);
+        if is_cancelled() {
             return Err("Operation cancelled".to_string());
         }
 
@@ -381,21 +435,21 @@ pub async fn apply_tags_to_directory(
         let file_path_str = file_path.to_string_lossy().to_string();
 
         // Get camera model
-        let (_has_date, camera_model) = if daemon_available {
-            read_exif_with_daemon(&state.exiftool_daemon, &file_path_str)
+        let (_has_date, camera_model) = if let Some(d) = daemon {
+            read_exif_with_daemon(d, &file_path_str)
         } else {
-            read_exif_with_command(&file_path_str)
+            read_exif_with_command_path(exiftool_path, &file_path_str)
         };
 
         // Get relative directory
         let rel_dir = file_path
             .parent()
-            .and_then(|p| p.strip_prefix(&path).ok())
+            .and_then(|p| p.strip_prefix(path).ok())
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
 
         // Match against rules
-        for rule in &rules {
+        for rule in rules {
             let mut matched = false;
 
             // Match camera
@@ -424,7 +478,6 @@ pub async fn apply_tags_to_directory(
     }
 
     if total_found == 0 {
-        state.remove_token(&operation_id);
         return Ok(0);
     }
 
@@ -433,27 +486,14 @@ pub async fn apply_tags_to_directory(
     let total_tags = tag_groups.len();
 
     for (i, (tag_name, files)) in tag_groups.into_iter().enumerate() {
-        if cancel_token.load(Ordering::Relaxed) {
-            state.remove_token(&operation_id);
+        if is_cancelled() {
             return Err("Operation cancelled".to_string());
         }
 
-        let _ = app_handle.emit(
-            "tag-progress",
-            TagProgress {
-                id: operation_id.clone(),
-                current: i + 1,
-                total: total_tags,
-                message: format!("Applying tag '{}' to {} files", tag_name, files.len()),
-            },
-        );
+        on_progress(i + 1, total_tags, &format!("Applying tag '{}' to {} files", tag_name, files.len()));
 
-        // We use -Keywords+=... to append to existing keywords
-        // We also use -Subject+=... for XMP compatibility
-        // We use -overwrite_original and -P to preserve mod date
-        // To avoid command line length limits, we'll process files in chunks of 50
         for chunk in files.chunks(50) {
-            let mut cmd = std::process::Command::new(&exiftool_path);
+            let mut cmd = std::process::Command::new(exiftool_path);
             cmd.args([
                 "-overwrite_original",
                 "-P",
@@ -474,8 +514,18 @@ pub async fn apply_tags_to_directory(
         }
     }
 
-    state.remove_token(&operation_id);
     Ok(tagged_count)
+}
+
+/// Helper to read EXIF with explicit command path
+fn read_exif_with_command_path(exiftool_path: &Path, file_path: &str) -> (bool, Option<String>) {
+    match read_exif_metadata_internal(exiftool_path, file_path) {
+        Ok(metadata) => (
+            metadata.date_time_original.is_some(),
+            metadata.get_camera_model()
+        ),
+        Err(_) => (false, None),
+    }
 }
 
 /// Write EXIF date to file ONLY if DateTimeOriginal is missing
@@ -632,27 +682,64 @@ pub async fn scan_missing_dates(
 ) -> Result<Vec<FileMetadataInfo>, String> {
     use std::sync::atomic::Ordering;
     use tauri::Emitter;
-    use walkdir::WalkDir;
 
     let cancel_token = state.register_token(&operation_id);
 
+    let exiftool_path = crate::binaries::Prerequisite::ExifTool
+        .discover(&app_handle)
+        .map_err(|e| format!("Failed to find exiftool: {}", e))?;
+
     // Try to start the ExifTool daemon for batch processing
-    let daemon_available = state.exiftool_daemon.ensure_started(None).is_ok();
+    let daemon_res = state.exiftool_daemon.ensure_started(None);
+    let daemon_available = daemon_res.is_ok();
+    
     if daemon_available {
         eprintln!("[INFO] Using ExifTool daemon for optimized scanning");
     } else {
         eprintln!("[WARN] ExifTool daemon unavailable, falling back to per-file processing");
     }
 
+    let results = scan_directory_internal(
+        Path::new(&path),
+        if daemon_available { Some(&state.exiftool_daemon) } else { None },
+        &exiftool_path,
+        |count| {
+            let _ = app_handle.emit(
+                "scan-progress",
+                ScanProgress {
+                    id: operation_id.clone(),
+                    count,
+                },
+            );
+        },
+        || cancel_token.load(Ordering::Relaxed),
+    );
+
+    state.remove_token(&operation_id);
+    results
+}
+
+pub fn scan_directory_internal<F, C>(
+    path: &Path,
+    daemon: Option<&crate::exiftool_daemon::SharedExifToolDaemon>,
+    exiftool_path: &Path,
+    mut on_progress: F,
+    is_cancelled: C,
+) -> Result<Vec<FileMetadataInfo>, String>
+where
+    F: FnMut(usize),
+    C: Fn() -> bool,
+{
+    use walkdir::WalkDir;
+
     let mut results = Vec::new();
     let mut scanned_count = 0;
 
-    let walker = WalkDir::new(&path).follow_links(true);
+    let walker = WalkDir::new(path).follow_links(true);
 
     for entry in walker.into_iter().filter_map(|e| e.ok()) {
         // Check cancellation
-        if cancel_token.load(Ordering::Relaxed) {
-            state.remove_token(&operation_id);
+        if is_cancelled() {
             return Err("Operation cancelled".to_string());
         }
 
@@ -677,10 +764,10 @@ pub async fn scan_missing_dates(
         let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
         // Try to read EXIF using daemon if available, fall back to Command
-        let (has_date, camera_model) = if daemon_available {
-            read_exif_with_daemon(&state.exiftool_daemon, &file_path_str)
+        let (has_date, camera_model) = if let Some(d) = daemon {
+            read_exif_with_daemon(d, &file_path_str)
         } else {
-            read_exif_with_command(&file_path_str)
+            read_exif_with_command_path(exiftool_path, &file_path_str)
         };
 
         // Try to extract date from filename
@@ -695,19 +782,12 @@ pub async fn scan_missing_dates(
 
         scanned_count += 1;
 
-        // Emit progress every 10 files to avoid flooding events
+        // Emit progress every 10 files
         if scanned_count % 10 == 0 {
-            let _ = app_handle.emit(
-                "scan-progress",
-                ScanProgress {
-                    id: operation_id.clone(),
-                    count: scanned_count,
-                },
-            );
+            on_progress(scanned_count);
         }
     }
 
-    state.remove_token(&operation_id);
     Ok(results)
 }
 
@@ -718,25 +798,6 @@ fn read_exif_with_daemon(
 ) -> (bool, Option<String>) {
     match daemon.read_metadata_json(file_path) {
         Ok(json_str) => parse_exif_json_for_scan(&json_str),
-        Err(_) => (false, None),
-    }
-}
-
-/// Read EXIF metadata by spawning exiftool (slow fallback path).
-fn read_exif_with_command(file_path: &str) -> (bool, Option<String>) {
-    // If we are falling back to command, we assume exiftool is in PATH or we just try "exiftool"
-    // In the daemon context, we might know the path, but here we are in a fallback.
-    // Ideally we should pass the resolved binary path here too, but for now "exiftool" is the best guess for system path.
-    match read_exif_metadata_internal(Path::new("exiftool"), file_path) {
-        Ok(metadata) => (
-            metadata.date_time_original.is_some(),
-            match (metadata.make, metadata.model) {
-                (Some(make), Some(model)) => Some(format!("{} {}", make.trim(), model.trim())),
-                (None, Some(model)) => Some(model),
-                (Some(make), None) => Some(make),
-                (None, None) => None,
-            },
-        ),
         Err(_) => (false, None),
     }
 }
@@ -824,15 +885,33 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_date_no_match() {
-        let result = extract_date_from_filename("random_image.jpg");
+    fn test_extract_date_invalid_date() {
+        // Month 15 is invalid
+        let result = extract_date_from_filename("20241599_143000.jpg");
+        assert!(result.is_none());
+
+        // Year out of range
+        let result = extract_date_from_filename("18000101_120000.jpg");
+        assert!(result.is_none());
+
+        // Day out of range
+        let result = extract_date_from_filename("20240132_120000.jpg");
+        assert!(result.is_none());
+
+        // Generic pattern invalid date
+        let result = extract_date_from_filename("photo_2024-13-01.jpg");
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_extract_date_invalid_date() {
-        // Month 15 is invalid
-        let result = extract_date_from_filename("20241599_143000.jpg");
+    fn test_extract_date_no_match() {
+        let result = extract_date_from_filename("random_image.jpg");
+        assert!(result.is_none());
+        
+        let result = extract_date_from_filename("no_extension");
+        assert!(result.is_none());
+
+        let result = extract_date_from_filename("");
         assert!(result.is_none());
     }
 
@@ -975,6 +1054,108 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_exif_json_for_scan() {
+        let json = r#"[{"DateTimeOriginal": "2024:01:15 14:30:00", "Make": "Apple", "Model": "iPhone 15"}]"#;
+        let (has_date, model) = parse_exif_json_for_scan(json);
+        assert!(has_date);
+        assert_eq!(model, Some("Apple iPhone 15".to_string()));
+
+        let json_no_make = r#"[{"DateTimeOriginal": "2024:01:15 14:30:00", "Model": "iPhone 15"}]"#;
+        let (has_date, model) = parse_exif_json_for_scan(json_no_make);
+        assert!(has_date);
+        assert_eq!(model, Some("iPhone 15".to_string()));
+
+        let json_no_date = r#"[{"Make": "Apple", "Model": "iPhone 15"}]"#;
+        let (has_date, model) = parse_exif_json_for_scan(json_no_date);
+        assert!(!has_date);
+        assert_eq!(model, Some("Apple iPhone 15".to_string()));
+
+        let json_empty = "[]";
+        let (has_date, model) = parse_exif_json_for_scan(json_empty);
+        assert!(!has_date);
+        assert_eq!(model, None);
+
+        let json_invalid = "invalid";
+        let (has_date, model) = parse_exif_json_for_scan(json_invalid);
+        assert!(!has_date);
+        assert_eq!(model, None);
+    }
+
+    #[test]
+    fn test_parse_exif_metadata() {
+        let json = serde_json::json!({
+            "DateTimeOriginal": "2024:01:15 14:30:00",
+            "Make": "Apple",
+            "Model": "iPhone 15",
+            "Keywords": ["Tag1", "Tag2"],
+            "XPKeywords": "Tag3; Tag4",
+            "Subject": ["Tag5", "Tag1"] // Duplicate Tag1
+        });
+
+        let meta = parse_exif_metadata(&json, "test.jpg");
+        assert_eq!(meta.file_path, "test.jpg");
+        assert_eq!(meta.date_time_original, Some("2024:01:15 14:30:00".to_string()));
+        assert_eq!(meta.make, Some("Apple".to_string()));
+        assert_eq!(meta.model, Some("iPhone 15".to_string()));
+        
+        // Check keywords (order might depend on implementation, but let's check existence)
+        assert!(meta.keywords.contains(&"Tag1".to_string()));
+        assert!(meta.keywords.contains(&"Tag2".to_string()));
+        assert!(meta.keywords.contains(&"Tag3".to_string()));
+        assert!(meta.keywords.contains(&"Tag4".to_string()));
+        assert!(meta.keywords.contains(&"Tag5".to_string()));
+        assert_eq!(meta.keywords.len(), 5);
+    }
+
+    #[test]
+    fn test_parse_exif_metadata_single_string_keywords() {
+        let json = serde_json::json!({
+            "Keywords": "SingleTag",
+            "Subject": "OtherTag"
+        });
+
+        let meta = parse_exif_metadata(&json, "test.jpg");
+        assert!(meta.keywords.contains(&"SingleTag".to_string()));
+        assert!(meta.keywords.contains(&"OtherTag".to_string()));
+        assert_eq!(meta.keywords.len(), 2);
+    }
+
+    #[test]
+    fn test_exif_metadata_get_camera_model() {
+        let mut meta = ExifMetadata {
+            file_path: "test.jpg".to_string(),
+            date_time_original: None,
+            create_date: None,
+            make: Some("Apple".to_string()),
+            model: Some("iPhone 15".to_string()),
+            software: None,
+            keywords: vec![],
+        };
+        assert_eq!(meta.get_camera_model(), Some("Apple iPhone 15".to_string()));
+
+        meta.make = Some("SONY".to_string());
+        meta.model = Some("ILCE-7M4".to_string());
+        assert_eq!(meta.get_camera_model(), Some("SONY ILCE-7M4".to_string()));
+
+        // Deduplication test
+        meta.make = Some("Sony".to_string());
+        meta.model = Some("SONY ILCE-7M4".to_string());
+        assert_eq!(meta.get_camera_model(), Some("SONY ILCE-7M4".to_string()));
+
+        meta.make = None;
+        meta.model = Some("iPhone 15".to_string());
+        assert_eq!(meta.get_camera_model(), Some("iPhone 15".to_string()));
+
+        meta.make = Some("Apple".to_string());
+        meta.model = None;
+        assert_eq!(meta.get_camera_model(), Some("Apple".to_string()));
+
+        meta.make = None;
+        meta.model = None;
+        assert_eq!(meta.get_camera_model(), None);
+    }
+
+    #[test]
     fn test_merge_conflicting_keywords() {
         use std::io::Write;
         use std::path::Path;
@@ -1075,5 +1256,162 @@ mod tests {
 
         check_field("Keywords");
         check_field("Subject");
+    }
+
+    #[test]
+    fn test_scan_directory_internal() {
+        let dir = tempfile::tempdir().unwrap();
+        let file1 = dir.path().join("20240115_143000.jpg");
+        let file2 = dir.path().join("no_date.txt");
+        
+        std::fs::File::create(&file1).unwrap();
+        std::fs::File::create(&file2).unwrap();
+
+        let results = scan_directory_internal(
+            dir.path(),
+            None,
+            Path::new("exiftool"),
+            |_| {},
+            || false
+        ).unwrap();
+
+        assert_eq!(results.len(), 1); // Only .jpg
+        assert_eq!(results[0].file_path, file1.to_string_lossy().to_string());
+        assert!(results[0].extracted_date.is_some());
+        assert_eq!(results[0].extracted_date.as_ref().unwrap().date, "2024-01-15");
+    }
+
+    #[test]
+    fn test_scan_directory_internal_cancellation() {
+        let dir = tempfile::tempdir().unwrap();
+        let file1 = dir.path().join("20240115_143000.jpg");
+        std::fs::File::create(&file1).unwrap();
+
+        let results = scan_directory_internal(
+            dir.path(),
+            None,
+            Path::new("exiftool"),
+            |_| {},
+            || true // Immediate cancel
+        );
+
+        assert!(results.is_err());
+        assert_eq!(results.unwrap_err(), "Operation cancelled");
+    }
+
+    #[test]
+    fn test_apply_tags_internal_no_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let rules = vec![TagRule {
+            name: "TestTag".to_string(),
+            camera_models: vec![],
+            directory_patterns: vec![],
+        }];
+
+        let result = apply_tags_internal(
+            dir.path(),
+            &rules,
+            None,
+            Path::new("exiftool"),
+            |_, _, _| {},
+            || false
+        ).unwrap();
+
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_apply_tags_internal_cancellation() {
+        let dir = tempfile::tempdir().unwrap();
+        let rules = vec![TagRule {
+            name: "TestTag".to_string(),
+            camera_models: vec![],
+            directory_patterns: vec![],
+        }];
+
+        let result = apply_tags_internal(
+            dir.path(),
+            &rules,
+            None,
+            Path::new("exiftool"),
+            |_, _, _| {},
+            || true // Immediate cancel
+        );
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Operation cancelled");
+    }
+
+    #[test]
+    fn test_apply_tags_internal_directory_match() {
+        let dir = tempfile::tempdir().unwrap();
+        let subdir = dir.path().join("Vacation");
+        std::fs::create_dir_all(&subdir).unwrap();
+        
+        let file1 = subdir.join("photo.jpg");
+        std::fs::File::create(&file1).unwrap();
+
+        let rules = vec![TagRule {
+            name: "VacationTag".to_string(),
+            camera_models: vec![],
+            directory_patterns: vec!["Vacation".to_string()],
+        }];
+
+        let mock_script = std::env::current_dir().unwrap().join("temp_test/mock_exiftool_success.sh");
+        let mock_script = if mock_script.exists() {
+            mock_script
+        } else {
+             std::env::current_dir().unwrap().join("src-tauri/temp_test/mock_exiftool_success.sh")
+        };
+
+        if !mock_script.exists() {
+            return;
+        }
+        
+        let result = apply_tags_internal(
+            dir.path(),
+            &rules,
+            None,
+            &mock_script,
+            |_, _, _| {},
+            || false
+        ).unwrap();
+
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn test_apply_tags_internal_model_match() {
+        let dir = tempfile::tempdir().unwrap();
+        let file1 = dir.path().join("photo.jpg");
+        std::fs::File::create(&file1).unwrap();
+
+        let rules = vec![TagRule {
+            name: "iPhoneTag".to_string(),
+            camera_models: vec!["iPhone".to_string()],
+            directory_patterns: vec![],
+        }];
+
+        let mock_script = std::env::current_dir().unwrap().join("temp_test/mock_exiftool_model.sh");
+        let mock_script = if mock_script.exists() {
+            mock_script
+        } else {
+             std::env::current_dir().unwrap().join("src-tauri/temp_test/mock_exiftool_model.sh")
+        };
+
+        if !mock_script.exists() {
+            return;
+        }
+        
+        let result = apply_tags_internal(
+            dir.path(),
+            &rules,
+            None,
+            &mock_script,
+            |_, _, _| {},
+            || false
+        ).unwrap();
+
+        assert_eq!(result, 1);
     }
 }
