@@ -350,11 +350,10 @@ describe('Ingest', () => {
             mockOpen.mockResolvedValueOnce('/test/source');
             
             // Mock run_unified_ingest to be slow/pending
-            let resolveIngest: any;
             mockInvoke.mockImplementation((cmd) => {
                 if (cmd === 'run_unified_ingest') {
-                    return new Promise((resolve) => {
-                        resolveIngest = resolve;
+                    return new Promise((_resolve) => {
+                        // Stay pending until canceled
                     });
                 }
                 if (cmd === 'cancel_operation') {

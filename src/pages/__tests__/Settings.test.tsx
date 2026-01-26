@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -9,7 +9,7 @@ import { load } from '@tauri-apps/plugin-store';
 const mockLoad = vi.mocked(load);
 
 vi.mock("@tauri-apps/api/core", () => ({
-    invoke: vi.fn((cmd) => {
+    invoke: vi.fn((cmd: string) => {
         if (cmd === 'verify_binary') {
             return Promise.resolve({ found: true, source: 'path', version: '1.0.0' });
         }
@@ -196,7 +196,7 @@ describe('Settings', () => {
         it('allows testing immich connection', async () => {
             const user = userEvent.setup();
             const { invoke } = await import('@tauri-apps/api/core');
-            (invoke as Mock).mockImplementation((cmd) => {
+            (invoke as Mock).mockImplementation((cmd: string) => {
                 if (cmd === 'validate_immich') return Promise.resolve('Connected successfully!');
                 if (cmd === 'verify_binary') return Promise.resolve({ found: true, source: 'path', version: '1.0.0' });
                 return Promise.resolve();
@@ -217,7 +217,7 @@ describe('Settings', () => {
         it('shows error message if connection fails', async () => {
             const user = userEvent.setup();
             const { invoke } = await import('@tauri-apps/api/core');
-            (invoke as Mock).mockImplementation((cmd) => {
+            (invoke as Mock).mockImplementation((cmd: string) => {
                 if (cmd === 'validate_immich') return Promise.reject('Network error');
                 if (cmd === 'verify_binary') return Promise.resolve({ found: true, source: 'path', version: '1.0.0' });
                 return Promise.resolve();
