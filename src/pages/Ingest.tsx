@@ -1,4 +1,4 @@
-import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, Image, Cloud, Archive, Camera, FolderTree, Tag, Plus, Search } from "lucide-react";
+import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, Image, Cloud, Archive, Camera, FolderTree, Tag, Plus, Search, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
@@ -345,6 +345,12 @@ export function Ingest() {
     setSourceTags(updatedTags);
     saveTags(updatedTags);
     setNewTagName("");
+  };
+
+  const handleRemoveTag = (tagId: string) => {
+    const updatedTags = sourceTags.filter(t => t.id !== tagId);
+    setSourceTags(updatedTags);
+    saveTags(updatedTags);
   };
 
   const handleAssignCameraToTag = (model: string, tagId: string | null) => {
@@ -705,9 +711,16 @@ export function Ingest() {
                   {sourceTags.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-4">
                       {sourceTags.map(tag => (
-                        <span key={tag.id} className={`${tag.color} px-2 py-1 rounded-full text-xs font-medium text-white flex items-center gap-1`}>
+                        <span key={tag.id} className={`${tag.color} pl-2 pr-1 py-1 rounded-full text-xs font-medium text-white flex items-center gap-1`}>
                           <Tag className="w-3 h-3" />
-                          {tag.name}
+                          <span className="mr-1">{tag.name}</span>
+                          <button
+                            onClick={() => handleRemoveTag(tag.id)}
+                            className="p-0.5 hover:bg-white/20 rounded-full transition-colors"
+                            title="Remove tag"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </span>
                       ))}
                     </div>
