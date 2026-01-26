@@ -21,7 +21,6 @@ describe('Dashboard', () => {
         renderDashboard();
         expect(screen.getByText('Ingest')).toBeInTheDocument();
         expect(screen.getByText('Clean & Dedup')).toBeInTheDocument();
-        expect(screen.getByText('Tag & Categorize')).toBeInTheDocument();
         expect(screen.getByText('Sync')).toBeInTheDocument();
     });
 
@@ -33,9 +32,6 @@ describe('Dashboard', () => {
 
         const cleanLink = screen.getByRole('link', { name: /clean/i });
         expect(cleanLink).toHaveAttribute('href', '/clean');
-
-        const organizeLink = screen.getByRole('link', { name: /tag/i });
-        expect(organizeLink).toHaveAttribute('href', '/organize');
 
         const syncLink = screen.getByRole('link', { name: /sync/i });
         expect(syncLink).toHaveAttribute('href', '/sync');

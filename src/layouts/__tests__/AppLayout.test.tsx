@@ -21,7 +21,6 @@ describe('AppLayout', () => {
             expect(screen.getByText('Home')).toBeInTheDocument();
             expect(screen.getByText('Ingest')).toBeInTheDocument();
             expect(screen.getByText('Clean & Dedup')).toBeInTheDocument();
-            expect(screen.getByText('Organize')).toBeInTheDocument();
             expect(screen.getByText('Export')).toBeInTheDocument();
         });
 

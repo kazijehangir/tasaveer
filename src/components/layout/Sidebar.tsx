@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Layers, Folder, HardDrive, Settings, Upload } from 'lucide-react';
+import { Home, Layers, HardDrive, Settings, Upload } from 'lucide-react';
 
 interface SidebarProps {
     activeTab: string;
@@ -10,7 +10,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     const menuItems = [
         { id: 'dashboard', label: 'Home', icon: Home },
         { id: 'ingest', label: 'Ingest', icon: HardDrive },
-        { id: 'organize', label: 'Organize', icon: Folder },
         { id: 'cleanup', label: 'Clean & Dedup', icon: Layers },
         { id: 'sync', label: 'Export', icon: Upload },
     ];

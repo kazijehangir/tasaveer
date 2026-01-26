@@ -24,7 +24,6 @@ export function AppLayout() {
     const path = location.pathname;
     if (path === "/") setActiveTab("dashboard");
     else if (path === "/ingest") setActiveTab("ingest");
-    else if (path === "/organize") setActiveTab("organize");
     else if (path === "/clean") setActiveTab("cleanup");
     else if (path === "/sync") setActiveTab("sync");
     else if (path === "/settings") setActiveTab("settings");
