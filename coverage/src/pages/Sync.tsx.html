@@ -401,40 +401,40 @@ export function Sync() {
     &lt;div className="space-y-8 animate-fade-in"&gt;
       {/* Header */}
       &lt;div&gt;
-        &lt;h1 className="text-4xl font-bold mb-2"&gt;
+        &lt;h1 className="text-4xl font-bold mb-2 text-text-main"&gt;
           &lt;span className="gradient-text"&gt;Sync&lt;/span&gt; to Immich
         &lt;/h1&gt;
-        &lt;p className="text-slate-400 text-lg"&gt;
+        &lt;p className="text-text-muted text-lg"&gt;
           Upload your media archive to your Immich server
         &lt;/p&gt;
       &lt;/div&gt;
 &nbsp;
       {/* Connection Status */}
       &lt;div className="glass-card p-8 relative overflow-hidden"&gt;
-        &lt;div className="absolute inset-0 bg-gradient-to-br from-green-600/10 via-transparent to-transparent" /&gt;
+        &lt;div className="absolute inset-0 bg-gradient-to-br from-green-500/5 via-transparent to-transparent pointer-events-none" /&gt;
         &lt;div className="relative z-10"&gt;
           &lt;div className="flex items-center justify-between mb-6"&gt;
             &lt;div className="flex items-center gap-3"&gt;
-              &lt;div className="p-3 rounded-xl bg-green-500/20"&gt;
-                &lt;Server className="w-6 h-6 text-green-400" /&gt;
+              &lt;div className="p-3 rounded-xl bg-green-500/10 dark:bg-green-500/20"&gt;
+                &lt;Server className="w-6 h-6 text-green-600 dark:text-green-400" /&gt;
               &lt;/div&gt;
               &lt;div&gt;
-                &lt;h2 className="text-xl font-bold"&gt;Immich Server&lt;/h2&gt;
-                &lt;p className="text-sm text-slate-400"&gt;Connection status&lt;/p&gt;
+                &lt;h2 className="text-xl font-bold text-text-main"&gt;Immich Server&lt;/h2&gt;
+                &lt;p className="text-sm text-text-muted"&gt;Connection status&lt;/p&gt;
               &lt;/div&gt;
             &lt;/div&gt;
             &lt;div className="flex items-center gap-2"&gt;
               &lt;div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse-glow" /&gt;
-              &lt;span className="text-sm text-yellow-400 font-medium"&gt;Not Configured&lt;/span&gt;
+              &lt;span className="text-sm text-yellow-600 dark:text-yellow-400 font-medium"&gt;Not Configured&lt;/span&gt;
             &lt;/div&gt;
           &lt;/div&gt;
           &lt;div className="flex items-center gap-4 text-sm"&gt;
-            &lt;div className="flex items-center gap-2 text-slate-400"&gt;
+            &lt;div className="flex items-center gap-2 text-text-muted"&gt;
               &lt;Cloud className="w-4 h-4" /&gt;
               &lt;span&gt;Server: Not set&lt;/span&gt;
             &lt;/div&gt;
-            &lt;div className="w-1 h-1 rounded-full bg-slate-600" /&gt;
-            &lt;div className="flex items-center gap-2 text-slate-400"&gt;
+            &lt;div className="w-1 h-1 rounded-full bg-neutral-400" /&gt;
+            &lt;div className="flex items-center gap-2 text-text-muted"&gt;
               &lt;Activity className="w-4 h-4" /&gt;
               &lt;span&gt;API: Not configured&lt;/span&gt;
             &lt;/div&gt;
@@ -446,77 +446,77 @@ export function Sync() {
       &lt;div className="grid grid-cols-1 md:grid-cols-3 gap-6"&gt;
         &lt;div className="glass-card p-6"&gt;
           &lt;div className="flex items-center gap-3 mb-2"&gt;
-            &lt;Clock className="w-5 h-5 text-purple-400" /&gt;
-            &lt;h3 className="text-sm font-medium text-slate-400"&gt;Last Sync&lt;/h3&gt;
+            &lt;Clock className="w-5 h-5 text-primary-500" /&gt;
+            &lt;h3 className="text-sm font-medium text-text-muted"&gt;Last Sync&lt;/h3&gt;
           &lt;/div&gt;
-          &lt;p className="text-2xl font-bold text-yellow-500"&gt;Never&lt;/p&gt;
+          &lt;p className="text-2xl font-bold text-yellow-600 dark:text-yellow-500"&gt;Never&lt;/p&gt;
         &lt;/div&gt;
 &nbsp;
         &lt;div className="glass-card p-6"&gt;
           &lt;div className="flex items-center gap-3 mb-2"&gt;
-            &lt;CheckCircle2 className="w-5 h-5 text-green-400" /&gt;
-            &lt;h3 className="text-sm font-medium text-slate-400"&gt;Files Synced&lt;/h3&gt;
+            &lt;CheckCircle2 className="w-5 h-5 text-green-500" /&gt;
+            &lt;h3 className="text-sm font-medium text-text-muted"&gt;Files Synced&lt;/h3&gt;
           &lt;/div&gt;
-          &lt;p className="text-2xl font-bold"&gt;0&lt;/p&gt;
+          &lt;p className="text-2xl font-bold text-text-main"&gt;0&lt;/p&gt;
         &lt;/div&gt;
 &nbsp;
         &lt;div className="glass-card p-6"&gt;
           &lt;div className="flex items-center gap-3 mb-2"&gt;
-            &lt;RefreshCw className="w-5 h-5 text-blue-400" /&gt;
-            &lt;h3 className="text-sm font-medium text-slate-400"&gt;Status&lt;/h3&gt;
+            &lt;RefreshCw className="w-5 h-5 text-primary-500" /&gt;
+            &lt;h3 className="text-sm font-medium text-text-muted"&gt;Status&lt;/h3&gt;
           &lt;/div&gt;
-          &lt;p className="text-2xl font-bold text-slate-500"&gt;Idle&lt;/p&gt;
+          &lt;p className="text-2xl font-bold text-text-muted"&gt;Idle&lt;/p&gt;
         &lt;/div&gt;
       &lt;/div&gt;
 &nbsp;
       {/* Sync Options */}
       &lt;div className="glass-card p-8"&gt;
-        &lt;h2 className="text-2xl font-bold mb-6"&gt;Sync Options&lt;/h2&gt;
+        &lt;h2 className="text-2xl font-bold mb-6 text-text-main"&gt;Sync Options&lt;/h2&gt;
         &lt;div className="space-y-4"&gt;
-          &lt;label className="flex items-center gap-4 p-4 rounded-xl bg-slate-800/50 hover:bg-slate-800/70 transition-colors cursor-pointer group"&gt;
+          &lt;label className="flex items-center gap-4 p-4 rounded-xl bg-surface-secondary hover:bg-surface-hover transition-colors cursor-pointer group border border-transparent hover:border-border"&gt;
             &lt;input
               type="checkbox"
               checked={syncAll}
               onChange={(e) =&gt; setSyncAll(e.target.checked)}
-              className="w-5 h-5 rounded bg-slate-700 border-2 border-slate-600 checked:bg-purple-500 checked:border-purple-500 transition-all cursor-pointer"
+              className="w-5 h-5 rounded border-2 border-neutral-400 text-primary-600 focus:ring-primary-500 transition-all cursor-pointer"
             /&gt;
             &lt;div className="flex-1"&gt;
-              &lt;h3 className="font-semibold text-white group-hover:text-purple-400 transition-colors"&gt;
+              &lt;h3 className="font-semibold text-text-main group-hover:text-primary-600 transition-colors"&gt;
                 Sync All Media
               &lt;/h3&gt;
-              &lt;p className="text-sm text-slate-400"&gt;
+              &lt;p className="text-sm text-text-muted"&gt;
                 Upload all files from your archive to Immich
               &lt;/p&gt;
             &lt;/div&gt;
           &lt;/label&gt;
 &nbsp;
-          &lt;label className="flex items-center gap-4 p-4 rounded-xl bg-slate-800/50 hover:bg-slate-800/70 transition-colors cursor-pointer group opacity-50"&gt;
+          &lt;label className="flex items-center gap-4 p-4 rounded-xl bg-surface-secondary opacity-50 cursor-not-allowed border border-transparent"&gt;
             &lt;input
               type="checkbox"
               disabled
-              className="w-5 h-5 rounded bg-slate-700 border-2 border-slate-600 cursor-not-allowed"
+              className="w-5 h-5 rounded border-2 border-neutral-400 cursor-not-allowed"
             /&gt;
             &lt;div className="flex-1"&gt;
-              &lt;h3 className="font-semibold text-white"&gt;
+              &lt;h3 className="font-semibold text-text-main"&gt;
                 Incremental Sync
               &lt;/h3&gt;
-              &lt;p className="text-sm text-slate-400"&gt;
+              &lt;p className="text-sm text-text-muted"&gt;
                 Only upload new or modified files (Coming soon)
               &lt;/p&gt;
             &lt;/div&gt;
           &lt;/label&gt;
 &nbsp;
-          &lt;label className="flex items-center gap-4 p-4 rounded-xl bg-slate-800/50 hover:bg-slate-800/70 transition-colors cursor-pointer group opacity-50"&gt;
+          &lt;label className="flex items-center gap-4 p-4 rounded-xl bg-surface-secondary opacity-50 cursor-not-allowed border border-transparent"&gt;
             &lt;input
               type="checkbox"
               disabled
-              className="w-5 h-5 rounded bg-slate-700 border-2 border-slate-600 cursor-not-allowed"
+              className="w-5 h-5 rounded border-2 border-neutral-400 cursor-not-allowed"
             /&gt;
             &lt;div className="flex-1"&gt;
-              &lt;h3 className="font-semibold text-white"&gt;
+              &lt;h3 className="font-semibold text-text-main"&gt;
                 Selective Sync
               &lt;/h3&gt;
-              &lt;p className="text-sm text-slate-400"&gt;
+              &lt;p className="text-sm text-text-muted"&gt;
                 Choose specific years or months to sync (Coming soon)
               &lt;/p&gt;
             &lt;/div&gt;
@@ -528,8 +528,8 @@ export function Sync() {
       &lt;div className="glass-card p-8"&gt;
         &lt;div className="flex items-center justify-between"&gt;
           &lt;div&gt;
-            &lt;h3 className="text-lg font-semibold mb-1"&gt;Ready to sync?&lt;/h3&gt;
-            &lt;p className="text-sm text-slate-400"&gt;
+            &lt;h3 className="text-lg font-semibold mb-1 text-text-main"&gt;Ready to sync?&lt;/h3&gt;
+            &lt;p className="text-sm text-text-muted"&gt;
               Configure your Immich server in Settings first
             &lt;/p&gt;
           &lt;/div&gt;
@@ -545,8 +545,8 @@ export function Sync() {
 &nbsp;
       {/* Sync History */}
       &lt;div className="glass-card p-8"&gt;
-        &lt;h2 className="text-2xl font-bold mb-6"&gt;Sync History&lt;/h2&gt;
-        &lt;div className="text-center py-12 text-slate-500"&gt;
+        &lt;h2 className="text-2xl font-bold mb-6 text-text-main"&gt;Sync History&lt;/h2&gt;
+        &lt;div className="text-center py-12 text-text-muted"&gt;
           &lt;RefreshCw className="w-12 h-12 mx-auto mb-4 opacity-30" /&gt;
           &lt;p className="text-lg"&gt;No sync history yet&lt;/p&gt;
           &lt;p className="text-sm mt-2"&gt;Your sync operations will be logged here&lt;/p&gt;
@@ -562,7 +562,7 @@ export function Sync() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-25T08:34:44.353Z
+                at 2026-01-26T01:10:26.014Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -30,9 +30,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">57.24% </span>
+                <span class="strong">56.61% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>79/138</span>
+                <span class='fraction'>77/136</span>
             </div>
         
             
@@ -879,7 +879,21 @@
 <a name='L814'></a><a href='#L814'>814</a>
 <a name='L815'></a><a href='#L815'>815</a>
 <a name='L816'></a><a href='#L816'>816</a>
-<a name='L817'></a><a href='#L817'>817</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L817'></a><a href='#L817'>817</a>
+<a name='L818'></a><a href='#L818'>818</a>
+<a name='L819'></a><a href='#L819'>819</a>
+<a name='L820'></a><a href='#L820'>820</a>
+<a name='L821'></a><a href='#L821'>821</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1108,6 +1122,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1128,6 +1143,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1639,14 +1655,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1764,6 +1772,16 @@ interface SimilarResult {
     total_groups: number;
 }
 &nbsp;
+interface ScanProgress {
+    id: string;
+    count: number;
+}
+&nbsp;
+interface DedupProgress {
+    id: string;
+    status: string;
+}
+&nbsp;
 type TabType = "metadata" | "duplicates" | "similar";
 &nbsp;
 export function Clean() {
@@ -1797,14 +1815,14 @@ export function Clean() {
         let unlistenSimilar: () =&gt; void;
 &nbsp;
         async function setupListeners() {
-            unlistenScan = await listen&lt;number&gt;("scan-progress", <span class="fstat-no" title="function not covered" >(e</span>vent) =&gt; {
-<span class="cstat-no" title="statement not covered" >                setProgress(`Scanned ${event.payload} files...`);</span>
+            unlistenScan = await listen&lt;ScanProgress&gt;("scan-progress", <span class="fstat-no" title="function not covered" >(e</span>vent) =&gt; {
+<span class="cstat-no" title="statement not covered" >                setProgress(`Scanned ${event.payload.count} files...`);</span>
             });
-            unlistenDedup = await listen&lt;string&gt;("dedup-progress", <span class="fstat-no" title="function not covered" >(e</span>vent) =&gt; {
-<span class="cstat-no" title="statement not covered" >                setProgress(event.payload);</span>
+            unlistenDedup = await listen&lt;DedupProgress&gt;("dedup-progress", <span class="fstat-no" title="function not covered" >(e</span>vent) =&gt; {
+<span class="cstat-no" title="statement not covered" >                setProgress(event.payload.status);</span>
             });
-            unlistenSimilar = await listen&lt;string&gt;("similar-progress", <span class="fstat-no" title="function not covered" >(e</span>vent) =&gt; {
-<span class="cstat-no" title="statement not covered" >                setProgress(event.payload);</span>
+            unlistenSimilar = await listen&lt;DedupProgress&gt;("similar-progress", <span class="fstat-no" title="function not covered" >(e</span>vent) =&gt; {
+<span class="cstat-no" title="statement not covered" >                setProgress(event.payload.status);</span>
             });
         }
         setupListeners();
@@ -1923,6 +1941,7 @@ export function Clean() {
             const results = await invoke&lt;DedupResult&gt;("find_duplicates", {
                 path: archivePath,
                 czkawkaPath: null,
+                operationId: "find_duplicates",
             });
             console.log("Duplicate scan results:", results);
             setDupResults(results);
@@ -1946,6 +1965,7 @@ export function Clean() {
             const results = <span class="cstat-no" title="statement not covered" >await invoke&lt;SimilarResult&gt;("find_similar_images", {</span>
                 path: archivePath,
                 czkawkaPath: null,
+                operationId: "find_similar_images",
             });
 <span class="cstat-no" title="statement not covered" >            console.log("Similar scan results:", results);</span>
 <span class="cstat-no" title="statement not covered" >            setSimilarResults(results);</span>
@@ -1990,10 +2010,10 @@ export function Clean() {
         &lt;div className="space-y-8 animate-fade-in pb-20"&gt;
             {/* Header */}
             &lt;div&gt;
-                &lt;h1 className="text-4xl font-bold mb-2"&gt;
+                &lt;h1 className="text-4xl font-bold mb-2 text-text-main"&gt;
                     Clean &amp; &lt;span className="gradient-text"&gt;Dedup&lt;/span&gt;
                 &lt;/h1&gt;
-                &lt;p className="text-slate-400 text-lg"&gt;
+                &lt;p className="text-text-muted text-lg"&gt;
                     Fix missing metadata and find duplicate files in your archive
                 &lt;/p&gt;
             &lt;/div&gt;
@@ -2001,14 +2021,14 @@ export function Clean() {
             {/* Error Display */}
             {error &amp;&amp; (
 <span class="branch-1 cbranch-no" title="branch not covered" >                &lt;div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-3"&gt;</span>
-                    &lt;AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" /&gt;
+                    &lt;AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0" /&gt;
                     &lt;div className="flex-1"&gt;
-                        &lt;p className="text-red-300 font-medium"&gt;Error&lt;/p&gt;
-                        &lt;p className="text-red-400 text-sm"&gt;{error}&lt;/p&gt;
+                        &lt;p className="text-red-600 dark:text-red-300 font-medium"&gt;Error&lt;/p&gt;
+                        &lt;p className="text-red-500 dark:text-red-400 text-sm"&gt;{error}&lt;/p&gt;
                     &lt;/div&gt;
                     &lt;button
                         onClick={<span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etError(null)}</span>
-                        className="text-red-400 hover:text-red-300 text-sm"
+                        className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 text-sm"
                     &gt;
                         Dismiss
                     &lt;/button&gt;
@@ -2019,27 +2039,27 @@ export function Clean() {
             &lt;div className="glass-card p-6"&gt;
                 &lt;div className="flex items-center justify-between"&gt;
                     &lt;div className="flex items-center gap-4"&gt;
-                        &lt;div className="p-3 rounded-lg bg-purple-500/20"&gt;
-                            &lt;FolderOpen className="w-6 h-6 text-purple-400" /&gt;
+                        &lt;div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-500/20"&gt;
+                            &lt;FolderOpen className="w-6 h-6 text-purple-600 dark:text-purple-400" /&gt;
                         &lt;/div&gt;
                         &lt;div&gt;
-                            &lt;p className="text-xs text-slate-400 uppercase tracking-wider font-bold"&gt;
+                            &lt;p className="text-xs text-text-muted uppercase tracking-wider font-bold"&gt;
                                 Archive Path
                             &lt;/p&gt;
-                            &lt;p className="text-sm font-medium truncate max-w-md"&gt;
+                            &lt;p className="text-sm font-medium truncate max-w-md text-text-main"&gt;
                                 {archivePath || "No path selected"}
                             &lt;/p&gt;
                         &lt;/div&gt;
                     &lt;/div&gt;
                     &lt;button
                         onClick={handleSelectPath}
-                        className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors text-sm font-medium"
+                        className="px-4 py-2 rounded-lg bg-surface-secondary hover:bg-surface-hover transition-colors text-sm font-medium text-text-main"
                     &gt;
                         Change
                     &lt;/button&gt;
                 &lt;/div&gt;
                 {czkawkaStatus &amp;&amp; (
-                    &lt;div className="mt-4 text-xs text-slate-500 flex items-center gap-2"&gt;
+                    &lt;div className="mt-4 text-xs text-text-muted flex items-center gap-2"&gt;
                         {czkawkaStatus.includes("found") ? (
                             &lt;CheckCircle2 className="w-4 h-4 text-green-500" /&gt;
                         ) : (
@@ -2055,8 +2075,8 @@ export function Clean() {
                 &lt;button
                     onClick={<span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etActiveTab("metadata")}</span>
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "metadata"
-                        ? "bg-purple-500/20 text-purple-300 border border-purple-500/50"
-                        : "bg-slate-800/50 text-slate-400 hover:text-white border border-transparent"
+                        ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/50"
+                        : "bg-surface-secondary text-text-muted hover:text-text-main border border-transparent"
                         }`}
                 &gt;
                     &lt;Calendar className="w-4 h-4" /&gt;
@@ -2065,8 +2085,8 @@ export function Clean() {
                 &lt;button
                     onClick={() =&gt; setActiveTab("duplicates")}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "duplicates"
-                        ? "bg-blue-500/20 text-blue-300 border border-blue-500/50"
-                        : "bg-slate-800/50 text-slate-400 hover:text-white border border-transparent"
+                        ? "bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/50"
+                        : "bg-surface-secondary text-text-muted hover:text-text-main border border-transparent"
                         }`}
                 &gt;
                     &lt;Copy className="w-4 h-4" /&gt;
@@ -2075,8 +2095,8 @@ export function Clean() {
                 &lt;button
                     onClick={() =&gt; setActiveTab("similar")}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "similar"
-                        ? "bg-teal-500/20 text-teal-300 border border-teal-500/50"
-                        : "bg-slate-800/50 text-slate-400 hover:text-white border border-transparent"
+                        ? "bg-teal-50 dark:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/50"
+                        : "bg-surface-secondary text-text-muted hover:text-text-main border border-transparent"
                         }`}
                 &gt;
                     &lt;Images className="w-4 h-4" /&gt;
@@ -2089,33 +2109,33 @@ export function Clean() {
                 &lt;div className="space-y-6"&gt;
                     &lt;div className="glass-card p-6"&gt;
                         &lt;div className="flex items-center justify-between mb-4"&gt;
-                            &lt;h2 className="text-xl font-bold flex items-center gap-2"&gt;
-                                &lt;Sparkles className="w-5 h-5 text-purple-400" /&gt;
+                            &lt;h2 className="text-xl font-bold flex items-center gap-2 text-text-main"&gt;
+                                &lt;Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" /&gt;
                                 Metadata Fixer
                             &lt;/h2&gt;
                             &lt;div className="flex items-center gap-4"&gt;
-                                &lt;label className="flex items-center gap-2 text-sm text-slate-400"&gt;
+                                &lt;label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer"&gt;
                                     &lt;input
                                         type="checkbox"
                                         checked={showOnlyMissing}
                                         onChange={<span class="fstat-no" title="function not covered" >(e</span>) =&gt; <span class="cstat-no" title="statement not covered" >setShowOnlyMissing(e.target.checked)}</span>
-                                        className="rounded border-slate-600"
+                                        className="rounded border-neutral-400 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
                                     /&gt;
                                     Show only missing dates
                                 &lt;/label&gt;
                                 {isScanning ? (
                                     &lt;div className="flex items-center gap-3"&gt;
                                         &lt;div className="flex flex-col items-end"&gt;
-                                            &lt;span className="text-xs text-slate-400 font-mono animate-pulse"&gt;
+                                            &lt;span className="text-xs text-text-muted font-mono animate-pulse"&gt;
                                                 {progress || <span class="branch-1 cbranch-no" title="branch not covered" >"Scanning..."}</span>
                                             &lt;/span&gt;
-                                            &lt;div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1"&gt;
+                                            &lt;div className="w-32 h-1 bg-neutral-200 dark:bg-slate-800 rounded-full overflow-hidden mt-1"&gt;
                                                 &lt;div className="h-full bg-purple-500 animate-indeterminate-bar" /&gt;
                                             &lt;/div&gt;
                                         &lt;/div&gt;
                                         &lt;button
                                             onClick={handleCancel}
-                                            className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                            className="px-3 py-1 bg-red-500/10 text-red-500 dark:text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
                                         &gt;
                                             Cancel
                                         &lt;/button&gt;
@@ -2135,11 +2155,11 @@ export function Clean() {
 &nbsp;
                         {metadataResults.length &gt; 0 &amp;&amp; (
                             &lt;&gt;
-                                &lt;div className="text-sm text-slate-400 mb-4"&gt;
+                                &lt;div className="text-sm text-text-muted mb-4"&gt;
                                     Found {filteredMetadata.length} files
                                     {showOnlyMissing &amp;&amp; ` missing dates`}
                                     {filesWithExtractedDate.length &gt; 0 &amp;&amp; (
-                                        &lt;span className="text-green-400 ml-2"&gt;
+                                        &lt;span className="text-green-600 dark:text-green-400 ml-2"&gt;
                                             ({filesWithExtractedDate.length} can be fixed from filename)
                                         &lt;/span&gt;
                                     )}
@@ -2151,7 +2171,7 @@ export function Clean() {
                                             key={file.file_path}
                                             className={`p-3 rounded-lg border transition-all ${file.extracted_date
                                                 ? "bg-green-500/5 border-green-500/20"
-                                                : <span class="branch-1 cbranch-no" title="branch not covered" >"bg-slate-800/30 border-slate-700"</span>
+                                                : <span class="branch-1 cbranch-no" title="branch not covered" >"bg-surface-secondary border-border"</span>
                                                 }`}
                                         &gt;
                                             &lt;div className="flex items-center justify-between"&gt;
@@ -2169,14 +2189,14 @@ export function Clean() {
                                                                 }
 <span class="cstat-no" title="statement not covered" >                                                                setSelectedForFix(newSet);</span>
                                                             }}
-                                                            className="rounded border-slate-600"
+                                                            className="rounded border-neutral-400 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
                                                         /&gt;
                                                     )}
                                                     &lt;div className="min-w-0 flex-1"&gt;
-                                                        &lt;p className="text-sm font-medium truncate"&gt;
+                                                        &lt;p className="text-sm font-medium truncate text-text-main"&gt;
                                                             {file.file_path.split("/").pop()}
                                                         &lt;/p&gt;
-                                                        &lt;div className="flex items-center gap-4 text-xs text-slate-500"&gt;
+                                                        &lt;div className="flex items-center gap-4 text-xs text-text-muted"&gt;
                                                             {file.camera_model &amp;&amp; (
 <span class="branch-1 cbranch-no" title="branch not covered" >                                                                &lt;span className="flex items-center gap-1"&gt;</span>
                                                                     &lt;Camera className="w-3 h-3" /&gt;
@@ -2184,20 +2204,20 @@ export function Clean() {
                                                                 &lt;/span&gt;
                                                             )}
                                                             {file.has_date ? (
-<span class="branch-0 cbranch-no" title="branch not covered" >                                                                &lt;span className="text-green-400"&gt;Has date&lt;/span&gt;</span>
+<span class="branch-0 cbranch-no" title="branch not covered" >                                                                &lt;span className="text-green-500 dark:text-green-400"&gt;Has date&lt;/span&gt;</span>
                                                             ) : (
-                                                                &lt;span className="text-yellow-400"&gt;Missing date&lt;/span&gt;
+                                                                &lt;span className="text-yellow-600 dark:text-yellow-400"&gt;Missing date&lt;/span&gt;
                                                             )}
                                                         &lt;/div&gt;
                                                     &lt;/div&gt;
                                                 &lt;/div&gt;
                                                 {file.extracted_date &amp;&amp; (
                                                     &lt;div className="text-right"&gt;
-                                                        &lt;p className="text-sm text-green-400 font-medium"&gt;
+                                                        &lt;p className="text-sm text-green-600 dark:text-green-400 font-medium"&gt;
                                                             {file.extracted_date.date}
                                                             {file.extracted_date.time &amp;&amp; ` ${file.extracted_date.time}`}
                                                         &lt;/p&gt;
-                                                        &lt;p className="text-xs text-slate-500"&gt;
+                                                        &lt;p className="text-xs text-text-muted"&gt;
                                                             from {file.extracted_date.source}
                                                         &lt;/p&gt;
                                                     &lt;/div&gt;
@@ -2222,7 +2242,7 @@ export function Clean() {
                         )}
 &nbsp;
                         {metadataResults.length === 0 &amp;&amp; !isScanning &amp;&amp; (
-                            &lt;div className="text-center py-12 text-slate-500"&gt;
+                            &lt;div className="text-center py-12 text-text-muted"&gt;
                                 &lt;Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" /&gt;
                                 &lt;p&gt;Select an archive path and click Scan to find files with missing dates&lt;/p&gt;
                             &lt;/div&gt;
@@ -2235,23 +2255,23 @@ export function Clean() {
                 &lt;div className="space-y-6"&gt;
                     &lt;div className="glass-card p-6"&gt;
                         &lt;div className="flex items-center justify-between mb-4"&gt;
-                            &lt;h2 className="text-xl font-bold flex items-center gap-2"&gt;
-                                &lt;Copy className="w-5 h-5 text-blue-400" /&gt;
+                            &lt;h2 className="text-xl font-bold flex items-center gap-2 text-text-main"&gt;
+                                &lt;Copy className="w-5 h-5 text-blue-500 dark:text-blue-400" /&gt;
                                 Exact Duplicates
                             &lt;/h2&gt;
                             {isScanning ? (
                                 &lt;div className="flex items-center gap-3"&gt;
                                     &lt;div className="flex flex-col items-end"&gt;
-                                        &lt;span className="text-xs text-slate-400 font-mono animate-pulse"&gt;
+                                        &lt;span className="text-xs text-text-muted font-mono animate-pulse"&gt;
                                             {progress || <span class="branch-1 cbranch-no" title="branch not covered" >"Processing..."}</span>
                                         &lt;/span&gt;
-                                        &lt;div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1"&gt;
+                                        &lt;div className="w-32 h-1 bg-neutral-200 dark:bg-slate-800 rounded-full overflow-hidden mt-1"&gt;
                                             &lt;div className="h-full bg-blue-500 animate-indeterminate-bar" /&gt;
                                         &lt;/div&gt;
                                     &lt;/div&gt;
                                     &lt;button
                                         onClick={handleCancel}
-                                        className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                        className="px-3 py-1 bg-red-500/10 text-red-500 dark:text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
                                     &gt;
                                         Cancel
                                     &lt;/button&gt;
@@ -2270,10 +2290,10 @@ export function Clean() {
 &nbsp;
                         {dupResults &amp;&amp; (
                             &lt;&gt;
-                                &lt;div className="flex items-center justify-between text-sm text-slate-400 mb-4"&gt;
+                                &lt;div className="flex items-center justify-between text-sm text-text-muted mb-4"&gt;
                                     &lt;div&gt;
                                         Found {dupResults.total_groups} duplicate groups
-                                        &lt;span className="text-red-400 ml-2"&gt;
+                                        &lt;span className="text-red-500 dark:text-red-400 ml-2"&gt;
                                             ({formatBytes(dupResults.total_wasted_space)} wasted)
                                         &lt;/span&gt;
                                     &lt;/div&gt;
@@ -2288,7 +2308,7 @@ export function Clean() {
                                             });
 <span class="cstat-no" title="statement not covered" >                                            setSelectedForDelete(allDuplicates);</span>
                                         }}
-                                        className="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs font-medium"
+                                        className="px-3 py-1 rounded bg-surface-secondary hover:bg-surface-hover text-xs font-medium text-text-main"
                                     &gt;
                                         Select All Duplicates
                                     &lt;/button&gt;
@@ -2298,9 +2318,9 @@ export function Clean() {
                                     {dupResults.duplicates.map((group, groupIdx) =&gt; (
                                         &lt;div
                                             key={groupIdx}
-                                            className="p-4 rounded-lg bg-slate-800/30 border border-slate-700"
+                                            className="p-4 rounded-lg bg-surface-secondary border border-border"
                                         &gt;
-                                            &lt;div className="text-xs text-slate-500 mb-2"&gt;
+                                            &lt;div className="text-xs text-text-muted mb-2"&gt;
                                                 {group.files.length} identical files • {formatBytes(group.size_bytes)} each
                                             &lt;/div&gt;
                                             &lt;div className="space-y-2"&gt;
@@ -2309,7 +2329,7 @@ export function Clean() {
                                                         key={file.path}
                                                         className={`flex items-center justify-between p-2 rounded ${fileIdx === 0
                                                             ? "bg-green-500/10 border border-green-500/20"
-                                                            : "bg-slate-900/50"
+                                                            : "bg-surface-secondary"
                                                             }`}
                                                     &gt;
                                                         &lt;div className="flex items-center gap-3"&gt;
@@ -2326,16 +2346,16 @@ export function Clean() {
                                                                         }
 <span class="cstat-no" title="statement not covered" >                                                                        setSelectedForDelete(newSet);</span>
                                                                     }}
-                                                                    className="rounded border-slate-600"
+                                                                    className="rounded border-neutral-400 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
                                                                 /&gt;
                                                             )}
                                                             {fileIdx === 0 &amp;&amp; (
-                                                                &lt;span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded flex-shrink-0"&gt;
+                                                                &lt;span className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-2 py-0.5 rounded flex-shrink-0"&gt;
                                                                     Keep
                                                                 &lt;/span&gt;
                                                             )}
                                                             &lt;span
-                                                                className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1"
+                                                                className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-text-main"
                                                                 style={{ direction: 'rtl', textAlign: 'left' }}
                                                                 title={file.path}
                                                             &gt;
@@ -2343,7 +2363,7 @@ export function Clean() {
                                                             &lt;/span&gt;
                                                         &lt;/div&gt;
                                                         {file.modified &amp;&amp; (
-                                                            &lt;span className="text-xs text-slate-500"&gt;{file.modified}&lt;/span&gt;
+                                                            &lt;span className="text-xs text-text-muted"&gt;{file.modified}&lt;/span&gt;
                                                         )}
                                                     &lt;/div&gt;
                                                 ))}
@@ -2356,7 +2376,7 @@ export function Clean() {
 <span class="branch-1 cbranch-no" title="branch not covered" >                                    &lt;div className="mt-4 flex justify-end"&gt;</span>
                                         &lt;button
                                             onClick={handleDeleteSelected}
-                                            className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 flex items-center gap-2 font-medium"
+                                            className="px-4 py-2 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 flex items-center gap-2 font-medium transition-colors"
                                         &gt;
                                             &lt;Trash2 className="w-4 h-4" /&gt;
                                             Delete {selectedForDelete.size} to Trash
@@ -2367,11 +2387,11 @@ export function Clean() {
                         )}
 &nbsp;
                         {!dupResults &amp;&amp; !isScanning &amp;&amp; (
-                            &lt;div className="text-center py-12 text-slate-500"&gt;
+                            &lt;div className="text-center py-12 text-text-muted"&gt;
                                 &lt;Copy className="w-12 h-12 mx-auto mb-4 opacity-50" /&gt;
                                 &lt;p&gt;Click "Find Duplicates" to scan for identical files using hash comparison&lt;/p&gt;
                                 {!czkawkaStatus?.includes("found") &amp;&amp; (
-                                    &lt;p className="text-yellow-500 mt-2"&gt;
+                                    &lt;p className="text-yellow-600 dark:text-yellow-500 mt-2"&gt;
                                         ⚠️ czkawka_cli is required. Install it first.
                                     &lt;/p&gt;
                                 )}
@@ -2386,27 +2406,27 @@ export function Clean() {
                     &lt;div className="glass-card p-6"&gt;
                         &lt;div className="flex items-center justify-between mb-4"&gt;
                             &lt;div&gt;
-                                &lt;h2 className="text-xl font-bold flex items-center gap-2"&gt;
-                                    &lt;Images className="w-5 h-5 text-teal-400" /&gt;
+                                &lt;h2 className="text-xl font-bold flex items-center gap-2 text-text-main"&gt;
+                                    &lt;Images className="w-5 h-5 text-teal-500 dark:text-teal-400" /&gt;
                                     Similar Images
                                 &lt;/h2&gt;
-                                &lt;p className="text-sm text-slate-500 mt-1"&gt;
+                                &lt;p className="text-sm text-text-muted mt-1"&gt;
                                     Review only — these may be intentional variations (burst shots, edits)
                                 &lt;/p&gt;
                             &lt;/div&gt;
                             {isScanning ? (
 <span class="branch-0 cbranch-no" title="branch not covered" >                                &lt;div className="flex items-center gap-3"&gt;</span>
                                     &lt;div className="flex flex-col items-end"&gt;
-                                        &lt;span className="text-xs text-slate-400 font-mono animate-pulse"&gt;
+                                        &lt;span className="text-xs text-text-muted font-mono animate-pulse"&gt;
                                             {progress || "Processing..."}
                                         &lt;/span&gt;
-                                        &lt;div className="w-32 h-1 bg-slate-800 rounded-full overflow-hidden mt-1"&gt;
+                                        &lt;div className="w-32 h-1 bg-neutral-200 dark:bg-slate-800 rounded-full overflow-hidden mt-1"&gt;
                                             &lt;div className="h-full bg-teal-500 animate-indeterminate-bar" /&gt;
                                         &lt;/div&gt;
                                     &lt;/div&gt;
                                     &lt;button
                                         onClick={handleCancel}
-                                        className="px-3 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
+                                        className="px-3 py-1 bg-red-500/10 text-red-500 dark:text-red-400 text-xs font-medium rounded hover:bg-red-500/20 border border-red-500/30 transition-colors"
                                     &gt;
                                         Cancel
                                     &lt;/button&gt;
@@ -2425,7 +2445,7 @@ export function Clean() {
 &nbsp;
                         {similarResults &amp;&amp; (
 <span class="branch-1 cbranch-no" title="branch not covered" >                            &lt;&gt;</span>
-                                &lt;div className="text-sm text-slate-400 mb-4"&gt;
+                                &lt;div className="text-sm text-text-muted mb-4"&gt;
                                     Found {similarResults.total_groups} groups of similar images
                                 &lt;/div&gt;
 &nbsp;
@@ -2433,18 +2453,18 @@ export function Clean() {
                                     {similarResults.similar_groups.map(<span class="fstat-no" title="function not covered" >(g</span>roup, groupIdx) =&gt; (
 <span class="cstat-no" title="statement not covered" >                                        &lt;div</span>
                                             key={groupIdx}
-                                            className="p-4 rounded-lg bg-slate-800/30 border border-teal-500/20"
+                                            className="p-4 rounded-lg bg-surface-secondary border border-teal-500/20"
                                         &gt;
-                                            &lt;div className="text-xs text-teal-400 mb-3"&gt;
+                                            &lt;div className="text-xs text-teal-600 dark:text-teal-400 mb-3"&gt;
                                                 {group.files.length} similar images • {group.similarity.toFixed(0)}% match
                                             &lt;/div&gt;
                                             &lt;div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"&gt;
                                                 {group.files.map(<span class="fstat-no" title="function not covered" >(f</span>ile, fileIdx) =&gt; (
 <span class="cstat-no" title="statement not covered" >                                                    &lt;div</span>
                                                         key={file.path}
-                                                        className="rounded-lg bg-slate-900/50 overflow-hidden border border-slate-700 hover:border-teal-500/50 transition-colors"
+                                                        className="rounded-lg bg-white dark:bg-slate-900/50 overflow-hidden border border-border hover:border-teal-500/50 transition-colors"
                                                     &gt;
-                                                        &lt;div className="aspect-square bg-slate-800 relative"&gt;
+                                                        &lt;div className="aspect-square bg-neutral-200 dark:bg-slate-800 relative"&gt;
                                                             &lt;img
                                                                 src={convertFileSrc(file.path)}
                                                                 alt={file.path.split("/").pop() || ""}
@@ -2458,9 +2478,9 @@ export function Clean() {
                                                                 }}
                                                             /&gt;
                                                             &lt;div
-                                                                className="absolute inset-0 items-center justify-center bg-slate-800 hidden"
+                                                                className="absolute inset-0 items-center justify-center bg-neutral-200 dark:bg-slate-800 hidden"
                                                             &gt;
-                                                                &lt;Eye className="w-8 h-8 text-slate-600" /&gt;
+                                                                &lt;Eye className="w-8 h-8 text-neutral-400 dark:text-slate-600" /&gt;
                                                             &lt;/div&gt;
                                                             {fileIdx === 0 &amp;&amp; (
                                                                 &lt;div className="absolute top-1 left-1 text-[10px] bg-teal-500/90 text-white px-1.5 py-0.5 rounded font-medium"&gt;
@@ -2468,16 +2488,16 @@ export function Clean() {
                                                                 &lt;/div&gt;
                                                             )}
                                                             {file.similarity &gt; 0 &amp;&amp; (
-                                                                &lt;div className="absolute top-1 right-1 text-[10px] bg-slate-900/80 text-slate-300 px-1.5 py-0.5 rounded"&gt;
+                                                                &lt;div className="absolute top-1 right-1 text-[10px] bg-neutral-900/80 text-white px-1.5 py-0.5 rounded"&gt;
                                                                     diff: {file.similarity}
                                                                 &lt;/div&gt;
                                                             )}
                                                         &lt;/div&gt;
                                                         &lt;div className="p-2"&gt;
-                                                            &lt;p className="text-xs truncate font-medium" title={file.path}&gt;
+                                                            &lt;p className="text-xs truncate font-medium text-text-main" title={file.path}&gt;
                                                                 {file.path.split("/").pop()}
                                                             &lt;/p&gt;
-                                                            &lt;p className="text-[10px] text-slate-500"&gt;
+                                                            &lt;p className="text-[10px] text-text-muted"&gt;
                                                                 {formatBytes(file.size)}
                                                                 {file.width &amp;&amp; file.height &amp;&amp; ` • ${file.width}×${file.height}`}
                                                             &lt;/p&gt;
@@ -2492,17 +2512,9 @@ export function Clean() {
                         )}
 &nbsp;
                         {!similarResults &amp;&amp; !isScanning &amp;&amp; (
-                            &lt;div className="text-center py-12 text-slate-500"&gt;
+                            &lt;div className="text-center py-12 text-text-muted"&gt;
                                 &lt;Images className="w-12 h-12 mx-auto mb-4 opacity-50" /&gt;
                                 &lt;p&gt;Click "Find Similar" to scan for visually similar images&lt;/p&gt;
-                                &lt;p className="text-xs mt-2 text-slate-600"&gt;
-                                    This is for review only — burst shots may be flagged
-                                &lt;/p&gt;
-                                {!czkawkaStatus?.includes("found") &amp;&amp; (
-                                    &lt;p className="text-yellow-500 mt-2"&gt;
-                                        ⚠️ czkawka_cli is required. Install it first.
-                                    &lt;/p&gt;
-                                )}
                             &lt;/div&gt;
                         )}
                     &lt;/div&gt;
@@ -2518,7 +2530,7 @@ export function Clean() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-25T08:34:44.359Z
+                at 2026-01-26T01:10:26.023Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -1549,7 +1549,7 @@ export function Settings() {
         &lt;h2 className="text-3xl font-bold mb-2"&gt;
           Settings
         &lt;/h2&gt;
-        &lt;p className="text-slate-400"&gt;
+        &lt;p className="text-text-muted"&gt;
           Configure external tools and connections
         &lt;/p&gt;
       &lt;/div&gt;
@@ -1566,7 +1566,7 @@ export function Settings() {
           &lt;button
             onClick={checkPrerequisites}
             disabled={validation.checking}
-            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+            className="p-2 hover:bg-surface-hover rounded-lg text-text-muted hover:text-text-main transition-colors"
             title="Recheck dependencies"
           &gt;
             &lt;RefreshCw className={`w-5 h-5 ${validation.checking ? 'animate-spin' : ''}`} /&gt;
@@ -1575,7 +1575,7 @@ export function Settings() {
 &nbsp;
         &lt;div className="space-y-4"&gt;
           {/* Phockup Status */}
-          &lt;div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50"&gt;
+          &lt;div className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary"&gt;
             &lt;div className="flex items-center gap-3"&gt;
               &lt;div className="p-2 rounded-lg bg-yellow-500/20"&gt;
                 &lt;Package className="w-5 h-5 text-yellow-400" /&gt;
@@ -1591,12 +1591,12 @@ export function Settings() {
                     GitHub
                   &lt;/button&gt;
                 &lt;/div&gt;
-                &lt;p className="text-sm text-slate-400"&gt;Media organization tool (requires manual install)&lt;/p&gt;
+                &lt;p className="text-sm text-text-muted"&gt;Media organization tool (requires manual install)&lt;/p&gt;
               &lt;/div&gt;
             &lt;/div&gt;
             &lt;div className="flex items-center gap-2"&gt;
               {validation.checking ? (
-                &lt;span className="text-slate-500 text-sm"&gt;Checking...&lt;/span&gt;
+                &lt;span className="text-text-muted text-sm"&gt;Checking...&lt;/span&gt;
               ) : validation.phockup ? (
                 &lt;&gt;
                   &lt;CheckCircle2 className="w-5 h-5 text-green-500" /&gt;
@@ -1614,7 +1614,7 @@ export function Settings() {
           &lt;/div&gt;
 &nbsp;
           {/* Immich-Go Status */}
-          &lt;div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50"&gt;
+          &lt;div className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary"&gt;
             &lt;div className="flex items-center gap-3"&gt;
               &lt;div className={`p-2 rounded-lg ${validation.immichGoSource === 'bundled' ? 'bg-green-500/20' : 'bg-yellow-500/20'}`}&gt;
                 &lt;Package className={`w-5 h-5 ${validation.immichGoSource === 'bundled' ? 'text-green-400' : 'text-yellow-400'}`} /&gt;
@@ -1630,7 +1630,7 @@ export function Settings() {
                     GitHub
                   &lt;/button&gt;
                 &lt;/div&gt;
-                &lt;p className="text-sm text-slate-400"&gt;
+                &lt;p className="text-sm text-text-muted"&gt;
                   {validation.immichGoSource === 'bundled'
                     ? 'Bundled with app (ready to use)'
                     : 'Immich upload utility'}
@@ -1639,7 +1639,7 @@ export function Settings() {
             &lt;/div&gt;
             &lt;div className="flex items-center gap-2"&gt;
               {validation.checking ? (
-                &lt;span className="text-slate-500 text-sm"&gt;Checking...&lt;/span&gt;
+                &lt;span className="text-text-muted text-sm"&gt;Checking...&lt;/span&gt;
               ) : validation.immichGo ? (
                 &lt;&gt;
                   &lt;CheckCircle2 className="w-5 h-5 text-green-500" /&gt;
@@ -1683,10 +1683,10 @@ export function Settings() {
 &nbsp;
         &lt;div className="space-y-6"&gt;
           &lt;div className="space-y-2"&gt;
-            &lt;label className="block text-sm font-medium text-slate-300"&gt;
+            &lt;label className="block text-sm font-medium text-text-muted"&gt;
               Canonical Archive Path
             &lt;/label&gt;
-            &lt;p className="text-xs text-slate-500 mb-2"&gt;
+            &lt;p className="text-xs text-text-tertiary mb-2"&gt;
               The master folder where your organized media will be stored
             &lt;/p&gt;
             &lt;div className="flex gap-3"&gt;
@@ -1719,7 +1719,7 @@ export function Settings() {
 &nbsp;
         &lt;div className="space-y-6"&gt;
           &lt;div className="space-y-2"&gt;
-            &lt;label className="block text-sm font-medium text-slate-300"&gt;
+            &lt;label className="block text-sm font-medium text-text-muted"&gt;
               Server URL
             &lt;/label&gt;
             &lt;input
@@ -1732,7 +1732,7 @@ export function Settings() {
           &lt;/div&gt;
 &nbsp;
           &lt;div className="space-y-2"&gt;
-            &lt;label className="block text-sm font-medium text-slate-300"&gt;
+            &lt;label className="block text-sm font-medium text-text-muted"&gt;
               API Key
             &lt;/label&gt;
             &lt;div className="relative"&gt;
@@ -1776,17 +1776,17 @@ export function Settings() {
           &lt;/div&gt;
           &lt;div&gt;
             &lt;h2 className="text-2xl font-bold"&gt;Advanced: Custom Binary Paths&lt;/h2&gt;
-            &lt;p className="text-sm text-slate-400"&gt;Override bundled or PATH binaries with your own&lt;/p&gt;
+            &lt;p className="text-sm text-text-muted"&gt;Override bundled or PATH binaries with your own&lt;/p&gt;
           &lt;/div&gt;
         &lt;/div&gt;
 &nbsp;
         &lt;div className="space-y-6"&gt;
           {/* Phockup Path Override */}
           &lt;div className="space-y-2"&gt;
-            &lt;label className="block text-sm font-medium text-slate-300"&gt;
+            &lt;label className="block text-sm font-medium text-text-muted"&gt;
               Phockup Binary Path
             &lt;/label&gt;
-            &lt;p className="text-xs text-slate-500 mb-2"&gt;
+            &lt;p className="text-xs text-text-tertiary mb-2"&gt;
               Leave empty to use system PATH. Set path to a custom phockup installation.
             &lt;/p&gt;
             &lt;div className="flex gap-3"&gt;
@@ -1833,10 +1833,10 @@ export function Settings() {
 &nbsp;
           {/* Immich-Go Path Override */}
           &lt;div className="space-y-2"&gt;
-            &lt;label className="block text-sm font-medium text-slate-300"&gt;
+            &lt;label className="block text-sm font-medium text-text-muted"&gt;
               Immich-Go Binary Path
             &lt;/label&gt;
-            &lt;p className="text-xs text-slate-500 mb-2"&gt;
+            &lt;p className="text-xs text-text-tertiary mb-2"&gt;
               Leave empty to use bundled version. Set path to override with custom installation.
             &lt;/p&gt;
             &lt;div className="flex gap-3"&gt;
@@ -1881,9 +1881,9 @@ export function Settings() {
             &lt;/div&gt;
           &lt;/div&gt;
 &nbsp;
-          &lt;div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/50"&gt;
-            &lt;p className="text-xs text-slate-400"&gt;
-              &lt;strong className="text-slate-300"&gt;Note:&lt;/strong&gt; After changing paths, click "Recheck" in the System Prerequisites section above to validate the binaries.
+          &lt;div className="p-4 rounded-xl bg-surface-secondary border border-border"&gt;
+            &lt;p className="text-xs text-text-muted"&gt;
+              &lt;strong className="text-text-main"&gt;Note:&lt;/strong&gt; After changing paths, click "Recheck" in the System Prerequisites section above to validate the binaries.
             &lt;/p&gt;
           &lt;/div&gt;
         &lt;/div&gt;
@@ -1930,7 +1930,7 @@ export function Settings() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-25T08:34:44.353Z
+                at 2026-01-26T01:10:26.014Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

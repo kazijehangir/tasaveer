@@ -40,6 +40,21 @@ interface OrganizeResult {
   errors: number;
 }
 
+interface FileOrganizeResult {
+  source_path: string;
+  dest_path: string | null;
+  status: string;
+  message: string | null;
+}
+
+interface OrganizePreview {
+  files: FileOrganizeResult[];
+  total_files: number;
+  will_organize: number;
+  will_skip: number;
+  duplicates: number;
+}
+
 // Predefined colors for tags
 const TAG_COLORS = [
   "bg-red-500",
@@ -70,7 +85,7 @@ export function Ingest() {
   const [destPath, setDestPath] = useState<string | null>(null);
 
 
-  const [status, setStatus] = useState<'idle' | 'scanning' | 'copying' | 'tagging' | 'organizing' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'scanning' | 'previewing' | 'copying' | 'tagging' | 'organizing' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLogsExpanded, setIsLogsExpanded] = useState(false);
   const cancelledRef = useRef(false);
@@ -84,13 +99,14 @@ export function Ingest() {
   const [directoryGroups, setDirectoryGroups] = useState<DirectoryGroup[]>([]);
 
   const [isScanned, setIsScanned] = useState(false);
+  const [previewData, setPreviewData] = useState<OrganizePreview | null>(null);
 
   // Log buffering
   const logBufferRef = useRef<string[]>([]);
   const flushIntervalRef = useRef<number | null>(null);
 
   // Helper to check if any operation is in progress
-  const isProcessing = ['scanning', 'copying', 'tagging', 'organizing'].includes(status);
+  const isProcessing = ['scanning', 'previewing', 'copying', 'tagging', 'organizing'].includes(status);
 
   // Flush logs periodically to avoid React render thrashing
   useEffect(() => {
@@ -141,7 +157,7 @@ export function Ingest() {
       if (selected) {
         setSourcePath(selected as string);
         setIsScanned(false); // Reset scan state on new source
-
+        setPreviewData(null); // Reset preview on new source
       }
     } catch (err) {
       console.error("Failed to select source:", err);
@@ -157,6 +173,7 @@ export function Ingest() {
       });
       if (selected) {
         setDestPath(selected as string);
+        setPreviewData(null); // Reset preview on new destination
       }
     } catch (err) {
       console.error("Failed to select destination:", err);
@@ -207,6 +224,27 @@ export function Ingest() {
       await store.save();
     } catch (err) {
       console.error("Failed to save tags:", err);
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!sourcePath || !destPath) return;
+    setStatus('previewing');
+    setPreviewData(null);
+    addToLogs(`Generating preview for: ${sourcePath} -> ${destPath}`);
+
+    try {
+      const result = await invoke<OrganizePreview>('preview_organize', {
+        sourcePath,
+        destPath,
+      });
+      setPreviewData(result);
+      addToLogs(`Preview complete: ${result.will_organize} to organize, ${result.will_skip} skipping, ${result.duplicates} duplicates.`);
+      setStatus('idle');
+    } catch (err) {
+      console.error("Preview failed:", err);
+      addToLogs(`Preview failed: ${err}`);
+      setStatus('error');
     }
   };
 
@@ -601,7 +639,7 @@ export function Ingest() {
                   </div>
                   <div className="truncate">
                     <p className="text-xs text-text-muted uppercase tracking-wider font-bold">Source</p>
-                    <p className="text-sm font-medium truncate text-text-main" title={sourcePath}>{sourcePath}</p>
+                    <p className="text-sm font-medium truncate text-text-main" title={sourcePath} data-testid="source-path-display">{sourcePath}</p>
                   </div>
                 </div>
                 <button onClick={() => setSourcePath(null)} className="p-2 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded-lg text-text-muted hover:text-text-main transition-colors">
@@ -753,7 +791,7 @@ export function Ingest() {
             <div className="mb-6 p-4 rounded-xl bg-surface-secondary border border-border">
               <h3 className="text-sm font-semibold text-text-muted mb-2">Archive Destination</h3>
               <div className="flex gap-2">
-                <div className="flex-1 truncate text-sm font-mono text-text-main bg-white dark:bg-black/20 p-2 rounded border border-border">
+                <div className="flex-1 truncate text-sm font-mono text-text-main bg-white dark:bg-black/20 p-2 rounded border border-border" data-testid="dest-path-display">
                   {destPath || "Not selected"}
                 </div>
                 <button onClick={handleSelectDest} className="p-2 bg-neutral-200 dark:bg-slate-700 hover:bg-neutral-300 dark:hover:bg-slate-600 rounded text-text-main">
@@ -786,28 +824,78 @@ export function Ingest() {
               </p>
             </div>
 
-            {/* Main Action Button */}
-            <button
-              onClick={handleIngest}
-              disabled={isProcessing || !sourcePath || !destPath}
-              className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all mb-6 flex items-center justify-center gap-2
-                 ${isProcessing
-                  ? 'bg-neutral-100 dark:bg-slate-800 text-text-muted cursor-not-allowed'
-                  : 'bg-primary-600 hover:bg-primary-500 text-white shadow-primary-500/30 hover:-translate-y-0.5'
-                }`}
-            >
-              {isProcessing ? (
-                <>
-                  <div className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-5 h-5" />
-                  Start Import
-                </>
-              )}
-            </button>
+            {/* Preview Action Button */}
+            <div className="flex gap-4 mb-6">
+              <button
+                onClick={handlePreview}
+                disabled={isProcessing || !sourcePath || !destPath}
+                className={`flex-1 py-3 rounded-xl font-bold border transition-all flex items-center justify-center gap-2
+                  ${isProcessing
+                    ? 'bg-neutral-100 dark:bg-slate-800 text-text-muted border-border cursor-not-allowed'
+                    : 'bg-surface-secondary border-primary-500 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10'
+                  }`}
+              >
+                {status === 'previewing' ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+                    Previewing...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    Preview
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleIngest}
+                disabled={isProcessing || !sourcePath || !destPath}
+                className={`flex-[2] py-4 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2
+                   ${isProcessing
+                    ? 'bg-neutral-100 dark:bg-slate-800 text-text-muted cursor-not-allowed'
+                    : 'bg-primary-600 hover:bg-primary-500 text-white shadow-primary-500/30 hover:-translate-y-0.5'
+                  }`}
+              >
+                {status === 'copying' || status === 'tagging' || status === 'organizing' ? (
+                  <>
+                    <div className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-5 h-5" />
+                    Start Import
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Preview Summary */}
+            {previewData && (
+              <div className="mb-6 p-4 rounded-xl bg-primary-50 dark:bg-primary-500/10 border border-primary-200 dark:border-primary-500/30 animate-in fade-in slide-in-from-top-2">
+                <h3 className="text-sm font-bold text-primary-800 dark:text-primary-200 mb-3 flex items-center gap-2">
+                  <Archive className="w-4 h-4" /> Preview Summary
+                </h3>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-lg bg-surface-main/50">
+                    <p className="text-xs text-text-muted uppercase font-bold mb-1">Organize</p>
+                    <p className="text-lg font-bold text-text-main">{previewData.will_organize}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-surface-main/50">
+                    <p className="text-xs text-text-muted uppercase font-bold mb-1">Skip</p>
+                    <p className="text-lg font-bold text-text-main">{previewData.will_skip}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-surface-main/50">
+                    <p className="text-xs text-text-muted uppercase font-bold mb-1">Dups</p>
+                    <p className="text-lg font-bold text-text-main">{previewData.duplicates}</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-text-muted mt-3 text-center">
+                  Preview based on current tags and metadata. Total files: {previewData.total_files}
+                </p>
+              </div>
+            )}
 
             {/* Progress / Status Display */}
             <div className="space-y-4">

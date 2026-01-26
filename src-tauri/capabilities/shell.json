@@ -10,21 +10,6 @@
             "identifier": "shell:allow-execute",
             "allow": [
                 {
-                    "name": "phockup",
-                    "cmd": "phockup",
-                    "args": true
-                },
-                {
-                    "name": "phockup.bat",
-                    "cmd": "phockup.bat",
-                    "args": true
-                },
-                {
-                    "name": "phockup.exe",
-                    "cmd": "phockup.exe",
-                    "args": true
-                },
-                {
                     "name": "exiftool",
                     "cmd": "exiftool",
                     "args": true
@@ -54,21 +39,6 @@
         {
             "identifier": "shell:allow-spawn",
             "allow": [
-                {
-                    "name": "phockup",
-                    "cmd": "phockup",
-                    "args": true
-                },
-                {
-                    "name": "phockup.bat",
-                    "cmd": "phockup.bat",
-                    "args": true
-                },
-                {
-                    "name": "phockup.exe",
-                    "cmd": "phockup.exe",
-                    "args": true
-                },
                 {
                     "name": "exiftool",
                     "cmd": "exiftool",

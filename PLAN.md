@@ -98,12 +98,13 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
 -   [x] Provide clear install instructions when binaries are missing
 
 #### 2.5 Organization Engine
--   [ ] Create `src-tauri/src/organize.rs` module
--   [ ] Implement logic: `Input Path` → `DateTimeOriginal` → `YYYY/MM/DD` dest
--   [ ] Add collision handling (hash comparison, smart rename)
--   [ ] Expose `preview_organize` (dry-run) to Frontend
--   [ ] Expose `run_organize` (execute) with progress event emission
--   [ ] *(After complete)* Remove phockup shell capabilities
+-   [x] Create `src-tauri/src/organize.rs` module
+-   [x] Implement logic: `Input Path` → `DateTimeOriginal` → `YYYY/MM/DD` dest
+-   [x] Add collision handling (hash comparison, smart rename)
+-   [x] Expose `preview_organize` (dry-run) to Frontend
+-   [x] Expose `run_organize` (execute) with progress event emission
+-   [ ] *(In Progress)* Remove phockup shell capabilities (Still in `shell.json`)
+-   [ ] Integrate `preview_organize` into Ingest UI
 
 ### Phase 3: The Ingest UI
 1.  **Source Selector**: Enhance "Import" tab to select source.
