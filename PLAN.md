@@ -185,15 +185,26 @@ The app will act as an orchestrator (GUI Wrapper) but will handle the "Phockup" 
 *   [ ] **Workflow Cards**: Use a bolder weight or darker shade for "STEP X" labels.
 *   [ ] **Sidebar**: Ensure section headers meet 3:1 contrast for non-text UI elements.
 
-### Phase 7: Testing & Quality
-1.  **Frontend Gaps (Focus on Logic) (In Progress)**:
+### Phase 7: Testing & Quality (In Progress)
+1.  **Frontend Gaps (Focus on Logic) (Completed)**:
     -   [x] **Ingest.tsx & Clean.tsx**: Added comprehensive tests for unified ingest, metadata fixing, and duplicate deletion.
     -   [x] **Settings.tsx**: Added tests for theme switching, connection testing, and custom binary paths.
 2.  **UI Component Testing (Completed)**:
     -   [x] Added unit tests for `Button`, `Card`, and `Input` to ensure they handle props correctly.
-3.  **Backend (Rust) Logic Expansion**:
-    -   [ ] Integration tests for `run_unified_ingest` using mock file system.
-    -   [ ] Test ExifTool daemon error recovery.
-4.  **Infrastructure**:
+3.  **Backend (Rust) Logic Expansion (ROADMAP)**:
+    -   **Current Status**: ~30% coverage. Focus is on surface-level commands and basic utilities.
+    -   **Roadmap**:
+        -   **Phase 1: High-Impact Integration**
+            -   [ ] Implement integration tests for `run_unified_ingest` using `tempfile` to verify end-to-end "Stage -> Tag -> Organize" flow.
+            -   [ ] Test `run_immich_go` command construction and dry-run modes.
+        -   **Phase 2: Deep Logic & Edge Cases**
+            -   [ ] Cover `organize.rs` branching (collisions, invalid dates, path resolution).
+            -   [ ] Cover `dedup.rs` hashing logic and large-set duplicate detection.
+        -   **Phase 3: Error Handling & Daemon Stability**
+            -   [ ] Mock `exiftool` process to test daemon error recovery and timeouts.
+            -   [ ] Test binary path resolution across platforms in `binaries.rs`.
+4.  **Infrastructure (Completed)**:
     -   [x] CI Coverage enforcement (Frontend + Rust).
+    -   [x] Automated `cargo-llvm-cov` integration in GitHub Actions.
+    -   [x] Sidecar binary caching and repository inclusion for Linux/macOS.
 

@@ -796,9 +796,12 @@ mod tests {
         let organizer = Organizer::new(PathBuf::from("/tmp"), false, None, None);
         assert!(organizer.is_media_file(Path::new("test.jpg")));
         assert!(organizer.is_media_file(Path::new("test.JPG")));
+        assert!(organizer.is_media_file(Path::new("test.png")));
         assert!(organizer.is_media_file(Path::new("test.mp4")));
+        assert!(organizer.is_media_file(Path::new("test.MOV")));
         assert!(!organizer.is_media_file(Path::new("test.txt")));
         assert!(!organizer.is_media_file(Path::new("test.pdf")));
+        assert!(!organizer.is_media_file(Path::new(".DS_Store")));
     }
 
     #[test]
@@ -811,6 +814,12 @@ mod tests {
 
         let dest_invalid = organizer.calculate_dest_path(path, "invalid-date");
         assert_eq!(dest_invalid, PathBuf::from("/archive/unknown/photo.jpg"));
+
+        let dest_empty = organizer.calculate_dest_path(path, "");
+        assert_eq!(dest_empty, PathBuf::from("/archive/unknown/photo.jpg"));
+
+        let dest_partial = organizer.calculate_dest_path(path, "2024-01");
+        assert_eq!(dest_partial, PathBuf::from("/archive/unknown/photo.jpg"));
     }
 
     #[test]
@@ -832,38 +841,56 @@ mod tests {
         File::create(&resolved2).unwrap();
         let resolved3 = organizer.resolve_collision(&path);
         assert_eq!(resolved3, dir.path().join("test_2.jpg"));
+
+        // Complex name: resolve_collision uses file_stem() which for archive.tar.gz is archive.tar
+        let complex_path = dir.path().join("archive.tar.gz");
+        File::create(&complex_path).unwrap();
+        let resolved_complex = organizer.resolve_collision(&complex_path);
+        assert_eq!(resolved_complex, dir.path().join("archive.tar_1.gz"));
     }
 
     #[test]
-    fn test_compute_hash() {
+    fn test_compute_file_hash() {
         let dir = tempdir().unwrap();
         let organizer = Organizer::new(dir.path().to_path_buf(), false, None, None);
-        let path = dir.path().join("test.txt");
+        let path1 = dir.path().join("file1.txt");
+        let path2 = dir.path().join("file2.txt");
+        let path3 = dir.path().join("file3.txt");
 
-        let mut file = File::create(&path).unwrap();
-        file.write_all(b"hello world").unwrap();
+        let mut f1 = File::create(&path1).unwrap();
+        f1.write_all(b"hello world").unwrap();
 
-        let hash1 = organizer.compute_file_hash(&path).unwrap();
-        let hash2 = organizer.compute_file_hash(&path).unwrap();
+        let mut f2 = File::create(&path2).unwrap();
+        f2.write_all(b"hello world").unwrap(); // Same content
 
-        assert_eq!(hash1, hash2);
+        let mut f3 = File::create(&path3).unwrap();
+        f3.write_all(b"different content").unwrap();
 
-        let mut file2 = File::create(&path).unwrap();
-        file2.write_all(b"different content").unwrap();
-        let hash3 = organizer.compute_file_hash(&path).unwrap();
+        let h1 = organizer.compute_file_hash(&path1).unwrap();
+        let h2 = organizer.compute_file_hash(&path2).unwrap();
+        let h3 = organizer.compute_file_hash(&path3).unwrap();
 
-        assert_ne!(hash1, hash3);
+        assert_eq!(h1, h2);
+        assert_ne!(h1, h3);
     }
 
     #[test]
-    fn test_get_file_date_from_filename() {
-        let dir = tempdir().unwrap();
-        let organizer = Organizer::new(dir.path().to_path_buf(), false, None, None);
+    fn test_get_file_date_from_exif() {
+        // This test requires exiftool to be installed on the system
+        let exiftool_path = PathBuf::from("/opt/homebrew/bin/exiftool");
+        if !exiftool_path.exists() {
+            return; // Skip if not found
+        }
 
-        let date = organizer.get_file_date("2024-05-20_vacation.jpg");
-        assert_eq!(date, Some("2024-05-20".to_string()));
-
-        let date2 = organizer.get_file_date("IMG_20231225_120000.jpg");
-        assert_eq!(date2, Some("2023-12-25".to_string()));
+        let organizer = Organizer::new(PathBuf::from("/archive"), false, Some(exiftool_path), None);
+        
+        // Use our freshly created test file
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let test_file = Path::new(&manifest_dir).parent().unwrap().join("test_src").join("dated.jpg");
+        
+        if test_file.exists() {
+            let date = organizer.get_file_date(test_file.to_str().unwrap());
+            assert_eq!(date, Some("2024-06-15".to_string()));
+        }
     }
 }

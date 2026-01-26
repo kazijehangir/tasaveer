@@ -441,6 +441,31 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_duplicate_json_multiple_groups() {
+        let json = r#"{
+            "1000": [[
+                {"path": "/a/1.jpg", "size": 1000, "modified_date": 0, "hash": "h1"},
+                {"path": "/b/1.jpg", "size": 1000, "modified_date": 0, "hash": "h1"}
+            ]],
+            "2000": [[
+                {"path": "/c/2.jpg", "size": 2000, "modified_date": 0, "hash": "h2"},
+                {"path": "/d/2.jpg", "size": 2000, "modified_date": 0, "hash": "h2"}
+            ]]
+        }"#;
+        let result = parse_duplicate_json(json).unwrap();
+        assert_eq!(result.total_groups, 2);
+        assert_eq!(result.total_wasted_space, 3000); // (1000*1) + (2000*1)
+    }
+
+    #[test]
+    fn test_parse_duplicate_json_malformed_inner() {
+        // Our parser is robust and uses unwrap_or for path/size
+        let json = r#"{"1000": [[{"invalid": "item"}]]}"#;
+        let result = parse_duplicate_json(json).unwrap();
+        assert_eq!(result.total_groups, 0); // Files with len <= 1 are ignored
+    }
+
+    #[test]
     fn test_parse_duplicate_json_invalid() {
         let result = parse_duplicate_json("invalid json");
         assert!(result.is_err());

@@ -219,7 +219,7 @@ async function downloadImmichGo(targetTriples) {
         const outputPath = path.join(BINARIES_DIR, outputName);
 
         // Check if already exists
-        if (fs.existsSync(outputPath)) {
+        if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
             console.log(`   ✓ ${outputName} already exists, skipping`);
             continue;
         }
@@ -273,7 +273,7 @@ async function downloadExifTool(targetTriples) {
         const outputPath = path.join(BINARIES_DIR, outputName);
 
         // Check if already exists
-        if (fs.existsSync(outputPath)) {
+        if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
             console.log(`   ✓ ${outputName} already exists, skipping`);
             continue;
         }

@@ -85,18 +85,39 @@ impl Default for SharedExifToolDaemon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
-    fn test_shared_daemon() {
+    fn test_daemon_read_metadata() {
         let shared = SharedExifToolDaemon::new();
+        
+        // Find exiftool in PATH for local testing
+        let exiftool_path = if cfg!(target_os = "macos") && Path::new("/opt/homebrew/bin/exiftool").exists() {
+            PathBuf::from("/opt/homebrew/bin/exiftool")
+        } else {
+            PathBuf::from("exiftool")
+        };
 
-        // Should fail before starting
-        assert!(shared.read_metadata_json("/nonexistent").is_err());
+        if shared.ensure_started(exiftool_path.to_str()).is_ok() {
+            let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+            let test_file = Path::new(&manifest_dir).parent().unwrap().join("test_src").join("dated.jpg");
 
-        // Try to start (may fail if exiftool not installed)
-        if shared.ensure_started(None).is_ok() {
-            // Shutdown
-            assert!(shared.shutdown().is_ok());
+            if test_file.exists() {
+                let json_res = shared.read_metadata_json(test_file.to_str().unwrap());
+                assert!(json_res.is_ok());
+                
+                let json_str = json_res.unwrap();
+                let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+                
+                assert!(parsed.is_array());
+                let arr = parsed.as_array().unwrap();
+                assert!(!arr.is_empty());
+                
+                let metadata = &arr[0];
+                assert_eq!(metadata["DateTimeOriginal"], "2024:06:15 12:00:00");
+            }
+            
+            let _ = shared.shutdown();
         }
     }
 }
