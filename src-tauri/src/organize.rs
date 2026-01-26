@@ -31,12 +31,12 @@ pub struct OrganizeResult {
 
 /// Progress update emitted during organization
 #[derive(Clone, Serialize)]
-struct OrganizeProgress {
-    id: String,
-    current: usize,
-    total: usize,
-    current_file: String,
-    status: String,
+pub struct OrganizeProgress {
+    pub id: String,
+    pub current: usize,
+    pub total: usize,
+    pub current_file: String,
+    pub status: String,
 }
 
 /// Single file result
@@ -198,19 +198,460 @@ impl Organizer {
         }
 
         // Fallback: use timestamp
-        let new_name = format!(
-            "{}_{}.{}",
-            stem,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis(),
-            ext
-        );
-        parent.join(new_name)
+        let now = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        parent.join(format!("{}_{}.{}", stem, now, ext))
     }
 
-    /// Check if a file is a media file
+    /// Preview organization (dry-run)
+    pub fn preview(&self, source: &Path) -> Result<OrganizePreview, String> {
+        if !source.exists() {
+            return Err(format!("Source path does not exist: {:?}", source));
+        }
+
+        let mut files = Vec::new();
+        let mut will_organize = 0;
+        let mut will_skip = 0;
+        let mut duplicates = 0;
+
+        // Track hashes for duplicate detection within preview
+        let mut seen_hashes: HashMap<String, String> = HashMap::new();
+
+        for entry in WalkDir::new(source)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let path = entry.path();
+
+            if path.is_dir() || !self.is_media_file(path) {
+                continue;
+            }
+
+            let file_path_str = path.to_string_lossy().to_string();
+
+            // Get date
+            let date = self.get_file_date(&file_path_str);
+
+            if date.is_none() {
+                files.push(FileOrganizeResult {
+                    source_path: file_path_str,
+                    dest_path: None,
+                    status: "skipped".to_string(),
+                    message: Some("No date found in EXIF or filename".to_string()),
+                });
+                will_skip += 1;
+                continue;
+            }
+
+            let date_str = date.unwrap();
+            let dest_file = self.calculate_dest_path(path, &date_str);
+
+            // Check for duplicates
+            if let Ok(hash) = self.compute_file_hash(path) {
+                if let Some(existing) = seen_hashes.get(&hash) {
+                    files.push(FileOrganizeResult {
+                        source_path: file_path_str,
+                        dest_path: None,
+                        status: "duplicate".to_string(),
+                        message: Some(format!("Duplicate of {}", existing)),
+                    });
+                    duplicates += 1;
+                    continue;
+                }
+                seen_hashes.insert(hash, file_path_str.clone());
+            }
+
+            files.push(FileOrganizeResult {
+                source_path: file_path_str,
+                dest_path: Some(dest_file.to_string_lossy().to_string()),
+                status: "will_organize".to_string(),
+                message: None,
+            });
+            will_organize += 1;
+        }
+
+        Ok(OrganizePreview {
+            total_files: files.len(),
+            files,
+            will_organize,
+            will_skip,
+            duplicates,
+        })
+    }
+
+    /// Run organization (move/copy files) with progress and cancellation support
+    pub fn run<F, C>(
+        &self,
+        source: &Path,
+        mut on_progress: F,
+        is_cancelled: C,
+    ) -> Result<OrganizeResult, String>
+    where
+        F: FnMut(usize, usize, &str, &str), // current, total, filename, status
+        C: Fn() -> bool,
+    {
+        if !source.exists() {
+            return Err(format!("Source path does not exist: {:?}", source));
+        }
+
+        // Count total files first
+        let total_files: usize = WalkDir::new(source)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_file() && self.is_media_file(e.path()))
+            .count();
+
+        let mut organized = 0;
+        let mut skipped = 0;
+        let mut duplicates = 0;
+        let mut errors = 0;
+        let mut current = 0;
+
+        // Track hashes for duplicate detection
+        let mut seen_hashes: HashMap<String, String> = HashMap::new();
+        let dest_path_str = self.dest_root.to_string_lossy().to_string();
+
+        for entry in WalkDir::new(source)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            // Check cancellation
+            if is_cancelled() {
+                return Ok(OrganizeResult {
+                    total_files,
+                    organized,
+                    skipped,
+                    duplicates,
+                    errors,
+                });
+            }
+
+            let path = entry.path();
+
+            if path.is_dir() || !self.is_media_file(path) {
+                continue;
+            }
+
+            current += 1;
+            let file_path_str = path.to_string_lossy().to_string();
+            let filename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown");
+
+            // Report progress
+            if current % 5 == 0 || current == 1 || current == total_files {
+                on_progress(current, total_files, filename, "processing");
+            }
+
+            // Get date
+            let date = match self.get_file_date(&file_path_str) {
+                Some(d) => d,
+                None => {
+                    skipped += 1;
+                    continue;
+                }
+            };
+
+            // Check for duplicates via hash
+            let hash = match self.compute_file_hash(path) {
+                Ok(h) => h,
+                Err(_) => {
+                    errors += 1;
+                    continue;
+                }
+            };
+
+            if let Some(existing) = seen_hashes.get(&hash) {
+                // Check if the existing file is in dest (already processed)
+                if existing.starts_with(&dest_path_str) {
+                    duplicates += 1;
+                    // If moving, delete the duplicate source
+                    if self.move_files {
+                        let _ = fs::remove_file(path);
+                    }
+                    continue;
+                }
+            }
+
+            // Calculate destination
+            let mut dest_file = self.calculate_dest_path(path, &date);
+
+            // Handle collision
+            if dest_file.exists() {
+                // Check if it's the same file (by hash)
+                if let Ok(existing_hash) = self.compute_file_hash(&dest_file) {
+                    if existing_hash == hash {
+                        duplicates += 1;
+                        if self.move_files {
+                            let _ = fs::remove_file(path);
+                        }
+                        continue;
+                    }
+                }
+                // Different file, resolve collision
+                dest_file = self.resolve_collision(&dest_file);
+            }
+
+            // Create parent directories
+            if let Some(parent) = dest_file.parent() {
+                if let Err(e) = fs::create_dir_all(parent) {
+                    eprintln!("Failed to create directory {:?}: {}", parent, e);
+                    errors += 1;
+                    continue;
+                }
+            }
+
+            // Move or copy
+            let result = if self.move_files {
+                // Try rename first (fastest for same filesystem)
+                fs::rename(path, &dest_file).or_else(|_| {
+                    // Cross-filesystem: copy then delete
+                    fs::copy(path, &dest_file).and_then(|_| fs::remove_file(path))
+                })
+            } else {
+                fs::copy(path, &dest_file).map(|_| ())
+            };
+
+            match result {
+                Ok(_) => {
+                    organized += 1;
+                    seen_hashes.insert(hash, dest_file.to_string_lossy().to_string());
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Failed to {} {:?}: {}",
+                        if self.move_files { "move" } else { "copy" },
+                        path,
+                        e
+                    );
+                    errors += 1;
+                }
+            }
+        }
+
+        Ok(OrganizeResult {
+            total_files,
+            organized,
+            skipped,
+            duplicates,
+            errors,
+        })
+    }
+
+    /// Unified ingest (Scan -> Hash -> Organize -> Tag)
+    pub fn unified_ingest<F, C>(
+        &self,
+        source: &Path,
+        rules: &[crate::metadata::TagRule],
+        enable_tagging: bool,
+        mut on_progress: F,
+        is_cancelled: C,
+    ) -> Result<OrganizeResult, String>
+    where
+        F: FnMut(usize, usize, &str, &str),
+        C: Fn() -> bool,
+    {
+        use rayon::prelude::*;
+
+        if !source.exists() {
+            return Err(format!("Source path does not exist: {:?}", source));
+        }
+
+        on_progress(0, 100, "Scanning source...", "scanning");
+
+        // 1. Discovery phase
+        let all_files: Vec<PathBuf> = WalkDir::new(source)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_file() && self.is_media_file(e.path()))
+            .map(|e| e.path().to_path_buf())
+            .collect();
+
+        let total_files = all_files.len();
+
+        // 2. Parallel hashing
+        on_progress(0, total_files, "Computing file hashes...", "hashing");
+
+        let file_hashes: HashMap<PathBuf, String> = all_files
+            .par_iter()
+            .map(|path| {
+                let hash = self.compute_file_hash(path).unwrap_or_default();
+                (path.clone(), hash)
+            })
+            .collect();
+
+        let mut organized = 0;
+        let mut skipped = 0;
+        let mut duplicates = 0;
+        let mut errors = 0;
+        let mut current = 0;
+
+        // Track hashes for duplicate detection
+        let mut seen_hashes: HashMap<String, String> = HashMap::new();
+        let mut tag_groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
+        let dest_path_str = self.dest_root.to_string_lossy().to_string();
+
+        // 3. Processing loop
+        for path in all_files {
+            if is_cancelled() {
+                break;
+            }
+
+            current += 1;
+            let file_path_str = path.to_string_lossy().to_string();
+            let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
+
+            if current % 10 == 0 || current == 1 || current == total_files {
+                on_progress(current, total_files, filename, "processing");
+            }
+
+            // Get date
+            let date = match self.get_file_date(&file_path_str) {
+                Some(d) => d,
+                None => {
+                    skipped += 1;
+                    continue;
+                }
+            };
+
+            // Use precomputed hash
+            let hash = file_hashes.get(&path).cloned().unwrap_or_default();
+            if hash.is_empty() {
+                errors += 1;
+                continue;
+            }
+
+            // Check duplicates
+            if let Some(existing) = seen_hashes.get(&hash) {
+                if existing.starts_with(&dest_path_str) {
+                    duplicates += 1;
+                    if self.move_files {
+                        let _ = fs::remove_file(&path);
+                    }
+                    continue;
+                }
+            }
+
+            let mut dest_file = self.calculate_dest_path(&path, &date);
+            if dest_file.exists() {
+                if let Ok(existing_hash) = self.compute_file_hash(&dest_file) {
+                    if existing_hash == hash {
+                        duplicates += 1;
+                        if self.move_files {
+                            let _ = fs::remove_file(&path);
+                        }
+                        continue;
+                    }
+                }
+                dest_file = self.resolve_collision(&dest_file);
+            }
+
+            // Create directory
+            if let Some(parent) = dest_file.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+
+            // Move or copy
+            let success = if self.move_files {
+                fs::rename(&path, &dest_file).or_else(|_|
+                    fs::copy(&path, &dest_file).and_then(|_| fs::remove_file(&path))
+                ).is_ok()
+            } else {
+                fs::copy(&path, &dest_file).is_ok()
+            };
+
+            if success {
+                organized += 1;
+                let final_dest_str = dest_file.to_string_lossy().to_string();
+                seen_hashes.insert(hash, final_dest_str.clone());
+
+                // Tagging logic
+                if enable_tagging {
+                    let camera_model = if let Some(daemon) = &self.daemon {
+                        daemon.read_metadata_json(&final_dest_str)
+                            .ok()
+                            .and_then(|json| {
+                                let parsed: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&json);
+                                parsed.ok()?.first()?.get("Model")?.as_str().map(|s| s.to_string())
+                            })
+                    } else {
+                        crate::metadata::read_exif_metadata_internal(&self.exiftool_path, &final_dest_str)
+                            .ok()
+                            .and_then(|m| m.model)
+                    };
+
+                    let rel_path_from_source = path.strip_prefix(source).ok()
+                        .and_then(|p| p.parent())
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    for rule in rules {
+                        let mut matched = false;
+                        if let Some(model) = &camera_model {
+                            if rule.camera_models.iter().any(|m| model.contains(m)) {
+                                matched = true;
+                            }
+                        }
+                        if !matched && !rel_path_from_source.is_empty() {
+                            if rule.directory_patterns.iter().any(|p| rel_path_from_source.contains(p)) {
+                                matched = true;
+                            }
+                        }
+
+                        if matched {
+                            tag_groups.entry(rule.name.clone()).or_default().push(dest_file.clone());
+                            break;
+                        }
+                    }
+                }
+            } else {
+                errors += 1;
+            }
+        }
+
+        // 4. Batch tagging
+        if enable_tagging && !tag_groups.is_empty() {
+            let total_tag_groups = tag_groups.len();
+            for (i, (tag_name, files)) in tag_groups.into_iter().enumerate() {
+                if is_cancelled() {
+                    break;
+                }
+
+                on_progress(current, total_files, &format!("Tagging: {}", tag_name), &format!("tagging {}/{}", i + 1, total_tag_groups));
+
+                for chunk in files.chunks(50) {
+                    let mut cmd = std::process::Command::new(&self.exiftool_path);
+                    cmd.args([
+                        "-overwrite_original",
+                        "-P",
+                        "-sep",
+                        ", ",
+                        &format!("-Keywords+={}", tag_name),
+                        &format!("-Subject+={}", tag_name),
+                    ]);
+                    for f in chunk {
+                        cmd.arg(f.to_string_lossy().to_string());
+                    }
+                    let _ = cmd.output();
+                }
+            }
+        }
+
+        Ok(OrganizeResult {
+            total_files,
+            organized,
+            skipped,
+            duplicates,
+            errors,
+        })
+    }
+
+    /// Check if file is a media file
+
     pub fn is_media_file(&self, path: &Path) -> bool {
         path.extension()
             .and_then(|e| e.to_str())
@@ -244,79 +685,7 @@ pub async fn preview_organize(
         Some(state.exiftool_daemon.clone()),
     );
 
-    if !source.exists() {
-        return Err(format!("Source path does not exist: {}", source_path));
-    }
-
-    let mut files = Vec::new();
-    let mut will_organize = 0;
-    let mut will_skip = 0;
-    let mut duplicates = 0;
-
-    // Track hashes for duplicate detection within preview
-    let mut seen_hashes: HashMap<String, String> = HashMap::new();
-
-    for entry in WalkDir::new(source)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        let path = entry.path();
-
-        if path.is_dir() || !organizer.is_media_file(path) {
-            continue;
-        }
-
-        let file_path_str = path.to_string_lossy().to_string();
-
-        // Get date
-        let date = organizer.get_file_date(&file_path_str);
-
-        if date.is_none() {
-            files.push(FileOrganizeResult {
-                source_path: file_path_str,
-                dest_path: None,
-                status: "skipped".to_string(),
-                message: Some("No date found in EXIF or filename".to_string()),
-            });
-            will_skip += 1;
-            continue;
-        }
-
-        let date_str = date.unwrap();
-        let dest_file = organizer.calculate_dest_path(path, &date_str);
-
-        // Check for duplicates
-        if let Ok(hash) = organizer.compute_file_hash(path) {
-            if let Some(existing) = seen_hashes.get(&hash) {
-                files.push(FileOrganizeResult {
-                    source_path: file_path_str,
-                    dest_path: None,
-                    status: "duplicate".to_string(),
-                    message: Some(format!("Duplicate of {}", existing)),
-                });
-                duplicates += 1;
-                continue;
-            }
-            seen_hashes.insert(hash, file_path_str.clone());
-        }
-
-        files.push(FileOrganizeResult {
-            source_path: file_path_str,
-            dest_path: Some(dest_file.to_string_lossy().to_string()),
-            status: "will_organize".to_string(),
-            message: None,
-        });
-        will_organize += 1;
-    }
-
-    Ok(OrganizePreview {
-        total_files: files.len(),
-        files,
-        will_organize,
-        will_skip,
-        duplicates,
-    })
+    organizer.preview(source)
 }
 
 /// Run organization (move/copy files)
@@ -349,178 +718,40 @@ pub async fn run_organize(
     );
     let cancel_token = state.register_token(&operation_id);
 
-    if !source.exists() {
-        return Err(format!("Source path does not exist: {}", source_path));
-    }
-
-    // Count total files first
-    let total_files: usize = WalkDir::new(source)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file() && organizer.is_media_file(e.path()))
-        .count();
-
-    let mut organized = 0;
-    let mut skipped = 0;
-    let mut duplicates = 0;
-    let mut errors = 0;
-    let mut current = 0;
-
-    // Track hashes for duplicate detection
-    let mut seen_hashes: HashMap<String, String> = HashMap::new();
-
-    for entry in WalkDir::new(source)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        // Check cancellation
-        if cancel_token.load(Ordering::Relaxed) {
-            state.remove_token(&operation_id);
-            return Ok(OrganizeResult {
-                total_files,
-                organized,
-                skipped,
-                duplicates,
-                errors,
-            });
-        }
-
-        let path = entry.path();
-
-        if path.is_dir() || !organizer.is_media_file(path) {
-            continue;
-        }
-
-        current += 1;
-        let file_path_str = path.to_string_lossy().to_string();
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-
-        // Emit progress
-        if current % 5 == 0 || current == 1 {
+    let result = organizer.run(
+        source,
+        |current, total, filename, status| {
             let _ = app_handle.emit(
                 "organize-progress",
                 OrganizeProgress {
                     id: operation_id.clone(),
                     current,
-                    total: total_files,
+                    total,
                     current_file: filename.to_string(),
-                    status: "processing".to_string(),
+                    status: status.to_string(),
                 },
             );
-        }
-
-        // Get date
-        let date = match organizer.get_file_date(&file_path_str) {
-            Some(d) => d,
-            None => {
-                skipped += 1;
-                continue;
-            }
-        };
-
-        // Check for duplicates via hash
-        let hash = match organizer.compute_file_hash(path) {
-            Ok(h) => h,
-            Err(_) => {
-                errors += 1;
-                continue;
-            }
-        };
-
-        if let Some(existing) = seen_hashes.get(&hash) {
-            // Check if the existing file is in dest (already processed)
-            if existing.starts_with(&dest_path) {
-                duplicates += 1;
-                // If moving, delete the duplicate source
-                if organizer.move_files {
-                    let _ = fs::remove_file(path);
-                }
-                continue;
-            }
-        }
-
-        // Calculate destination
-        let mut dest_file = organizer.calculate_dest_path(path, &date);
-
-        // Handle collision
-        if dest_file.exists() {
-            // Check if it's the same file (by hash)
-            if let Ok(existing_hash) = organizer.compute_file_hash(&dest_file) {
-                if existing_hash == hash {
-                    duplicates += 1;
-                    if organizer.move_files {
-                        let _ = fs::remove_file(path);
-                    }
-                    continue;
-                }
-            }
-            // Different file, resolve collision
-            dest_file = organizer.resolve_collision(&dest_file);
-        }
-
-        // Create parent directories
-        if let Some(parent) = dest_file.parent() {
-            if let Err(e) = fs::create_dir_all(parent) {
-                eprintln!("Failed to create directory {:?}: {}", parent, e);
-                errors += 1;
-                continue;
-            }
-        }
-
-        // Move or copy
-        let result = if organizer.move_files {
-            // Try rename first (fastest for same filesystem)
-            fs::rename(path, &dest_file).or_else(|_| {
-                // Cross-filesystem: copy then delete
-                fs::copy(path, &dest_file).and_then(|_| fs::remove_file(path))
-            })
-        } else {
-            fs::copy(path, &dest_file).map(|_| ())
-        };
-
-        match result {
-            Ok(_) => {
-                organized += 1;
-                seen_hashes.insert(hash, dest_file.to_string_lossy().to_string());
-            }
-            Err(e) => {
-                eprintln!(
-                    "Failed to {} {:?}: {}",
-                    if organizer.move_files { "move" } else { "copy" },
-                    path,
-                    e
-                );
-                errors += 1;
-            }
-        }
-    }
+        },
+        || cancel_token.load(Ordering::Relaxed),
+    );
 
     state.remove_token(&operation_id);
 
-    // Final progress
-    let _ = app_handle.emit(
-        "organize-progress",
-        OrganizeProgress {
-            id: operation_id,
-            current: total_files,
-            total: total_files,
-            current_file: "".to_string(),
-            status: "complete".to_string(),
-        },
-    );
+    // Final progress update if successful
+    if let Ok(res) = &result {
+        let _ = app_handle.emit(
+            "organize-progress",
+            OrganizeProgress {
+                id: operation_id,
+                current: res.total_files,
+                total: res.total_files,
+                current_file: "Complete".to_string(),
+                status: "complete".to_string(),
+            },
+        );
+    }
 
-    Ok(OrganizeResult {
-        total_files,
-        organized,
-        skipped,
-        duplicates,
-        errors,
-    })
+    result
 }
 
 /// Unified ingest command that combines staging, tagging, and organization.
@@ -537,14 +768,9 @@ pub async fn run_unified_ingest(
     operation_id: String,
 ) -> Result<OrganizeResult, String> {
     use std::sync::atomic::Ordering;
-    use tauri::Emitter;
 
     let source = Path::new(&source_path);
     let dest = Path::new(&dest_path);
-
-    if !source.exists() {
-        return Err(format!("Source path does not exist: {}", source_path));
-    }
 
     // 1. Discovery phase
     let exiftool_path = crate::binaries::Prerequisite::ExifTool
@@ -555,233 +781,47 @@ pub async fn run_unified_ingest(
     let organizer = Organizer::new(
         dest.to_path_buf(),
         move_files,
-        Some(exiftool_path.clone()),
+        Some(exiftool_path),
         Some(state.exiftool_daemon.clone()),
     );
     let cancel_token = state.register_token(&operation_id);
 
-    // Initial progress
-    let _ = app_handle.emit(
-        "organize-progress",
-        OrganizeProgress {
-            id: operation_id.clone(),
-            current: 0,
-            total: 100, // Placeholder until counted
-            current_file: "Scanning source...".to_string(),
-            status: "scanning".to_string(),
-        },
-    );
-
-    // Collect all media files
-    let all_files: Vec<PathBuf> = WalkDir::new(source)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file() && organizer.is_media_file(e.path()))
-        .map(|e| e.path().to_path_buf())
-        .collect();
-
-    let total_files = all_files.len();
-
-    // Parallel hashing (CPU intensive)
-    let _ = app_handle.emit(
-        "organize-progress",
-        OrganizeProgress {
-            id: operation_id.clone(),
-            current: 0,
-            total: total_files,
-            current_file: "Computing file hashes...".to_string(),
-            status: "hashing".to_string(),
-        },
-    );
-
-    use rayon::prelude::*;
-    let file_hashes: HashMap<PathBuf, String> = all_files
-        .par_iter()
-        .map(|path| {
-            let hash = organizer.compute_file_hash(path).unwrap_or_default();
-            (path.clone(), hash)
-        })
-        .collect();
-
-    let mut organized = 0;
-    let mut skipped = 0;
-    let mut duplicates = 0;
-    let mut errors = 0;
-    let mut current = 0;
-
-    // We'll group files by tag for efficient batch tagging later if enabled
-    let mut tag_groups: HashMap<String, Vec<PathBuf>> = HashMap::new();
-    let mut seen_hashes: HashMap<String, String> = HashMap::new();
-
-    // 2. Processing phase
-    for path in all_files {
-        if cancel_token.load(Ordering::Relaxed) {
-            break;
-        }
-
-        current += 1;
-        let file_path_str = path.to_string_lossy().to_string();
-        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
-
-        if current % 10 == 0 || current == 1 {
+    let result = organizer.unified_ingest(
+        source,
+        &rules,
+        enable_tagging,
+        |current, total, filename, status| {
             let _ = app_handle.emit(
                 "organize-progress",
                 OrganizeProgress {
                     id: operation_id.clone(),
                     current,
-                    total: total_files,
+                    total,
                     current_file: filename.to_string(),
-                    status: "processing".to_string(),
+                    status: status.to_string(),
                 },
             );
-        }
-
-        // Get date
-        let date = match organizer.get_file_date(&file_path_str) {
-            Some(d) => d,
-            None => {
-                skipped += 1;
-                continue;
-            }
-        };
-
-        // Use precomputed hash
-        let hash = file_hashes.get(&path).cloned().unwrap_or_default();
-        if hash.is_empty() {
-            errors += 1;
-            continue;
-        }
-
-        // Check duplicates in dest
-        let mut dest_file = organizer.calculate_dest_path(&path, &date);
-        if dest_file.exists() {
-            if let Ok(existing_hash) = organizer.compute_file_hash(&dest_file) {
-                if existing_hash == hash {
-                    duplicates += 1;
-                    if move_files {
-                        let _ = fs::remove_file(&path);
-                    }
-                    continue;
-                }
-            }
-            dest_file = organizer.resolve_collision(&dest_file);
-        }
-
-        // Create directory
-        if let Some(parent) = dest_file.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-
-        // Copy/Move
-        let success = if move_files {
-            fs::rename(&path, &dest_file).or_else(|_| {
-                fs::copy(&path, &dest_file).and_then(|_| fs::remove_file(&path))
-            }).is_ok()
-        } else {
-            fs::copy(&path, &dest_file).is_ok()
-        };
-
-        if success {
-            organized += 1;
-            seen_hashes.insert(hash, dest_file.to_string_lossy().to_string());
-
-            // Determine tag if enabled
-            if enable_tagging {
-                let camera_model = state.exiftool_daemon.read_metadata_json(&dest_file.to_string_lossy())
-                    .ok()
-                    .and_then(|json| {
-                        let parsed: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&json);
-                        parsed.ok()?.first()?.get("Model")?.as_str().map(|s| s.to_string())
-                    });
-
-                let rel_path_from_source = path.strip_prefix(source).ok()
-                    .and_then(|p| p.parent())
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default();
-
-                for rule in &rules {
-                    let mut matched = false;
-                    if let Some(model) = &camera_model {
-                        if rule.camera_models.iter().any(|m| model.contains(m)) {
-                            matched = true;
-                        }
-                    }
-                    if !matched && !rel_path_from_source.is_empty() {
-                        if rule.directory_patterns.iter().any(|p| rel_path_from_source.contains(p)) {
-                            matched = true;
-                        }
-                    }
-
-                    if matched {
-                        tag_groups.entry(rule.name.clone()).or_default().push(dest_file.clone());
-                        break;
-                    }
-                }
-            }
-        } else {
-            errors += 1;
-        }
-    }
-
-    // 3. Batch Tagging Phase
-    if enable_tagging && !tag_groups.is_empty() {
-        let total_tag_groups = tag_groups.len();
-        for (i, (tag_name, files)) in tag_groups.into_iter().enumerate() {
-            if cancel_token.load(Ordering::Relaxed) {
-                break;
-            }
-
-            let _ = app_handle.emit(
-                "organize-progress",
-                OrganizeProgress {
-                    id: operation_id.clone(),
-                    current,
-                    total: total_files,
-                    current_file: format!("Tagging: {}", tag_name),
-                    status: format!("tagging {}/{}", i + 1, total_tag_groups),
-                },
-            );
-
-            for chunk in files.chunks(50) {
-                let mut cmd = std::process::Command::new(&exiftool_path);
-                cmd.args([
-                    "-overwrite_original",
-                    "-P",
-                    "-sep",
-                    ", ",
-                    &format!("-Keywords+={}", tag_name),
-                    &format!("-Subject+={}", tag_name),
-                ]);
-                for f in chunk {
-                    cmd.arg(f.to_string_lossy().to_string());
-                }
-                let _ = cmd.output();
-            }
-        }
-    }
+        },
+        || cancel_token.load(Ordering::Relaxed),
+    );
 
     state.remove_token(&operation_id);
 
-    // Final result
-    let _ = app_handle.emit(
-        "organize-progress",
-        OrganizeProgress {
-            id: operation_id,
-            current: total_files,
-            total: total_files,
-            current_file: "Complete".to_string(),
-            status: "complete".to_string(),
-        },
-    );
+    // Final result emission
+    if let Ok(res) = &result {
+        let _ = app_handle.emit(
+            "organize-progress",
+            OrganizeProgress {
+                id: operation_id,
+                current: res.total_files,
+                total: res.total_files,
+                current_file: "Complete".to_string(),
+                status: "complete".to_string(),
+            },
+        );
+    }
 
-    Ok(OrganizeResult {
-        total_files,
-        organized,
-        skipped,
-        duplicates,
-        errors,
-    })
+    result
 }
 
 #[cfg(test)]
@@ -797,11 +837,15 @@ mod tests {
         assert!(organizer.is_media_file(Path::new("test.jpg")));
         assert!(organizer.is_media_file(Path::new("test.JPG")));
         assert!(organizer.is_media_file(Path::new("test.png")));
+        assert!(organizer.is_media_file(Path::new("test.heic")));
+        assert!(organizer.is_media_file(Path::new("test.webp")));
         assert!(organizer.is_media_file(Path::new("test.mp4")));
         assert!(organizer.is_media_file(Path::new("test.MOV")));
+        assert!(organizer.is_media_file(Path::new("test.mkv")));
         assert!(!organizer.is_media_file(Path::new("test.txt")));
         assert!(!organizer.is_media_file(Path::new("test.pdf")));
         assert!(!organizer.is_media_file(Path::new(".DS_Store")));
+        assert!(!organizer.is_media_file(Path::new("test"))); // No extension
     }
 
     #[test]
@@ -820,6 +864,9 @@ mod tests {
 
         let dest_partial = organizer.calculate_dest_path(path, "2024-01");
         assert_eq!(dest_partial, PathBuf::from("/archive/unknown/photo.jpg"));
+
+        let dest_wrong = organizer.calculate_dest_path(path, "2024/01/15");
+        assert_eq!(dest_wrong, PathBuf::from("/archive/unknown/photo.jpg"));
     }
 
     #[test]
@@ -872,6 +919,172 @@ mod tests {
 
         assert_eq!(h1, h2);
         assert_ne!(h1, h3);
+    }
+
+    #[test]
+    fn test_organizer_preview() {
+        let source_dir = tempdir().unwrap();
+        let dest_dir = tempdir().unwrap();
+        
+        let file1 = source_dir.path().join("20240115_143000.jpg");
+        let file2 = source_dir.path().join("IMG_20240116_100000.png");
+        let file3 = source_dir.path().join("no_date.txt");
+        let file4 = source_dir.path().join("20240115_143000_dup.jpg"); // Same as file1 content
+
+        File::create(&file1).unwrap().write_all(b"content1").unwrap();
+        File::create(&file2).unwrap().write_all(b"content2").unwrap();
+        File::create(&file3).unwrap().write_all(b"content3").unwrap();
+        File::create(&file4).unwrap().write_all(b"content1").unwrap();
+
+        let organizer = Organizer::new(dest_dir.path().to_path_buf(), false, None, None);
+        let preview = organizer.preview(source_dir.path()).unwrap();
+
+        assert_eq!(preview.total_files, 3); // jpg, png are media, txt is not
+        assert_eq!(preview.will_organize, 2);
+        assert_eq!(preview.duplicates, 1);
+        assert_eq!(preview.will_skip, 0); // No date found would be skip, but our media files have dates
+    }
+
+    #[test]
+    fn test_organizer_run() {
+        let source_dir = tempdir().unwrap();
+        let dest_dir = tempdir().unwrap();
+        
+        let file1 = source_dir.path().join("20240115_143000.jpg");
+        let file2 = source_dir.path().join("IMG_20240116_100000.png");
+        
+        File::create(&file1).unwrap().write_all(b"content1").unwrap();
+        File::create(&file2).unwrap().write_all(b"content2").unwrap();
+
+        let organizer = Organizer::new(dest_dir.path().to_path_buf(), false, None, None);
+        
+        let mut progress_count = 0;
+        let result = organizer.run(
+            source_dir.path(),
+            |_, _, _, _| progress_count += 1,
+            || false
+        ).unwrap();
+
+        assert_eq!(result.total_files, 2);
+        assert_eq!(result.organized, 2);
+        assert!(progress_count > 0);
+        
+        // Verify files exist in destination
+        assert!(dest_dir.path().join("2024/2024-01-15/20240115_143000.jpg").exists());
+        assert!(dest_dir.path().join("2024/2024-01-16/IMG_20240116_100000.png").exists());
+    }
+
+    #[test]
+    fn test_organizer_run_cancellation() {
+        let source_dir = tempdir().unwrap();
+        let dest_dir = tempdir().unwrap();
+        
+        let file1 = source_dir.path().join("20240115_143000.jpg");
+        File::create(&file1).unwrap().write_all(b"content1").unwrap();
+
+        let organizer = Organizer::new(dest_dir.path().to_path_buf(), false, None, None);
+        
+        // Immediate cancellation
+        let result = organizer.run(
+            source_dir.path(),
+            |_, _, _, _| {},
+            || true
+        ).unwrap();
+
+        assert_eq!(result.organized, 0);
+    }
+
+    #[test]
+    fn test_organizer_run_duplicates() {
+        let source_dir = tempdir().unwrap();
+        let dest_dir = tempdir().unwrap();
+        
+        let file1 = source_dir.path().join("20240115_143000.jpg");
+        let file2 = source_dir.path().join("20240115_143000_dup.jpg");
+        
+        File::create(&file1).unwrap().write_all(b"same_content").unwrap();
+        File::create(&file2).unwrap().write_all(b"same_content").unwrap();
+
+        let organizer = Organizer::new(dest_dir.path().to_path_buf(), false, None, None);
+        let result = organizer.run(
+            source_dir.path(),
+            |_, _, _, _| {},
+            || false
+        ).unwrap();
+
+        assert_eq!(result.total_files, 2);
+        assert_eq!(result.organized, 1);
+        assert_eq!(result.duplicates, 1);
+    }
+
+    #[test]
+    fn test_organizer_run_collisions() {
+        let source_dir = tempdir().unwrap();
+        let dest_dir = tempdir().unwrap();
+        
+        // Setup existing file in destination to cause collision
+        let dest_file = dest_dir.path().join("2024/2024-01-15/20240115_143000.jpg");
+        fs::create_dir_all(dest_file.parent().unwrap()).unwrap();
+        File::create(&dest_file).unwrap().write_all(b"existing_different_content").unwrap();
+
+        let source_file = source_dir.path().join("20240115_143000.jpg");
+        File::create(&source_file).unwrap().write_all(b"new_content").unwrap();
+
+        let organizer = Organizer::new(dest_dir.path().to_path_buf(), false, None, None);
+        let result = organizer.run(
+            source_dir.path(),
+            |_, _, _, _| {},
+            || false
+        ).unwrap();
+
+        assert_eq!(result.organized, 1);
+        assert_eq!(result.duplicates, 0);
+        
+        // Verify it was renamed
+        assert!(dest_dir.path().join("2024/2024-01-15/20240115_143000_1.jpg").exists());
+    }
+
+    #[test]
+    fn test_organizer_unified_ingest() {
+        let source_dir = tempdir().unwrap();
+        let dest_dir = tempdir().unwrap();
+        
+        let file1 = source_dir.path().join("20240115_143000.jpg");
+        File::create(&file1).unwrap().write_all(b"content1").unwrap();
+
+        let organizer = Organizer::new(dest_dir.path().to_path_buf(), false, None, None);
+        let rules = vec![crate::metadata::TagRule {
+            name: "TestTag".to_string(),
+            camera_models: vec![],
+            directory_patterns: vec!["source".to_string()],
+        }];
+
+        let result = organizer.unified_ingest(
+            source_dir.path(),
+            &rules,
+            false, // disable tagging for simple test
+            |_, _, _, _| {},
+            || false
+        ).unwrap();
+
+        assert_eq!(result.total_files, 1);
+        assert_eq!(result.organized, 1);
+        assert!(dest_dir.path().join("2024/2024-01-15/20240115_143000.jpg").exists());
+    }
+
+    #[test]
+    fn test_get_file_date_filename_fallback() {
+        let organizer = Organizer::new(PathBuf::from("/archive"), false, None, None);
+        
+        // 2024-01-15 14.30.00.jpg -> should be extracted from filename
+        let date = organizer.get_file_date("2024-01-15 14.30.00.jpg");
+        assert_eq!(date, Some("2024-01-15".to_string()));
+
+        let date2 = organizer.get_file_date("IMG_20240220_100000.jpg");
+        assert_eq!(date2, Some("2024-02-20".to_string()));
+
+        let date3 = organizer.get_file_date("random.jpg");
+        assert_eq!(date3, None);
     }
 
     #[test]

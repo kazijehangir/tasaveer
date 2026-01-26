@@ -120,4 +120,19 @@ mod tests {
             let _ = shared.shutdown();
         }
     }
+
+    #[test]
+    fn test_daemon_not_started() {
+        let shared = SharedExifToolDaemon::new();
+        let result = shared.read_metadata_json("any_file.jpg");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "ExifTool not started");
+    }
+
+    #[test]
+    fn test_daemon_shutdown() {
+        let shared = SharedExifToolDaemon::new();
+        // Just checking it doesn't panic and resets inner
+        assert!(shared.shutdown().is_ok());
+    }
 }

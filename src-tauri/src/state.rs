@@ -57,3 +57,46 @@ impl AppState {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_app_state_new() {
+        let state = AppState::new();
+        assert!(state.cancellation_tokens.lock().unwrap().is_empty());
+        assert!(state.running_processes.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_register_and_cancel_token() {
+        let state = AppState::new();
+        let id = "test-op";
+        let token = state.register_token(id);
+        
+        assert_eq!(token.load(Ordering::Relaxed), false);
+        assert!(state.cancellation_tokens.lock().unwrap().contains_key(id));
+
+        state.cancel(id);
+        assert_eq!(token.load(Ordering::Relaxed), true);
+    }
+
+    #[test]
+    fn test_remove_token() {
+        let state = AppState::new();
+        let id = "test-op";
+        state.register_token(id);
+        
+        assert!(state.cancellation_tokens.lock().unwrap().contains_key(id));
+        state.remove_token(id);
+        assert!(!state.cancellation_tokens.lock().unwrap().contains_key(id));
+    }
+
+    #[test]
+    fn test_cancel_nonexistent_token() {
+        let state = AppState::new();
+        // Should not panic
+        state.cancel("nonexistent");
+    }
+}

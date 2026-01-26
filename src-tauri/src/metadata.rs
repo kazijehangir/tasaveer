@@ -12,15 +12,21 @@ use std::path::Path;
 use std::process::Command;
 
 lazy_static! {
-    static ref WHATSAPP_ANDROID_RE: Regex = Regex::new(r"IMG-(\d{4})(\d{2})(\d{2})-WA").unwrap();
+    static ref WHATSAPP_ANDROID_RE: Regex = Regex::new(r"^IMG-(\d{4})(\d{2})(\d{2})-WA").unwrap();
     static ref WHATSAPP_IOS_RE: Regex =
-        Regex::new(r"WhatsApp.*(\d{4})-(\d{2})-(\d{2})(?:\s+at\s+(\d{2})\.(\d{2})\.(\d{2}))?")
+        Regex::new(r"^WhatsApp.*(\d{4})-(\d{2})-(\d{2})(?:\s+at\s+(\d{2})\.(\d{2})\.(\d{2}))?")
             .unwrap();
     static ref SCREENSHOT_MAC_RE: Regex =
-        Regex::new(r"Screenshot\s+(\d{4})-(\d{2})-(\d{2})\s+at\s+(\d{2})\.(\d{2})\.(\d{2})")
+        Regex::new(r"^Screenshot\s+(\d{4})-(\d{2})-(\d{2})\s+at\s+(\d{2})\.(\d{2})\.(\d{2})")
             .unwrap();
     static ref ANDROID_CAMERA_RE: Regex =
-        Regex::new(r"(?:IMG_)?(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})").unwrap();
+        Regex::new(r"^(?:IMG_)?(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})").unwrap();
+    static ref GOOGLE_PHOTOS_RE: Regex =
+        Regex::new(r"^PXL_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})").unwrap();
+    static ref SAMSUNG_RE: Regex =
+        Regex::new(r"^(\d{4})-(\d{2})-(\d{2})\s+(\d{2})\.(\d{2})\.(\d{2})").unwrap();
+    static ref WINDOWS_SCREENSHOT_RE: Regex =
+        Regex::new(r"^Screenshot\s+(\d{4})-(\d{2})-(\d{2})\s+(\d{6})").unwrap();
     static ref GENERIC_DATE_RE: Regex = Regex::new(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})").unwrap();
 }
 
@@ -94,6 +100,15 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
         });
     }
 
+    // Google Photos: PXL_20240115_143000123.jpg
+    if let Some(caps) = GOOGLE_PHOTOS_RE.captures(filename) {
+        return Some(ExtractedDate {
+            date: format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]),
+            time: Some(format!("{}:{}:{}", &caps[4], &caps[5], &caps[6])),
+            source: "Google Photos".to_string(),
+        });
+    }
+
     // Android Camera: 20240115_143000.jpg or IMG_20240115_143000.jpg
     if let Some(caps) = ANDROID_CAMERA_RE.captures(filename) {
         let year: u32 = caps[1].parse().unwrap_or(0);
@@ -108,6 +123,26 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
                 source: "Camera".to_string(),
             });
         }
+    }
+
+    // Samsung: 2024-01-15 14.30.00.jpg
+    if let Some(caps) = SAMSUNG_RE.captures(filename) {
+        return Some(ExtractedDate {
+            date: format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]),
+            time: Some(format!("{}:{}:{}", &caps[4], &caps[5], &caps[6])),
+            source: "Samsung".to_string(),
+        });
+    }
+
+    // Windows Screenshot: Screenshot 2024-01-15 143000.png
+    if let Some(caps) = WINDOWS_SCREENSHOT_RE.captures(filename) {
+        let time_raw = &caps[4];
+        let time = Some(format!("{}:{}:{}", &time_raw[0..2], &time_raw[2..4], &time_raw[4..6]));
+        return Some(ExtractedDate {
+            date: format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]),
+            time,
+            source: "Screenshot".to_string(),
+        });
     }
 
     // Generic date pattern: YYYY-MM-DD or YYYYMMDD anywhere in filename
@@ -834,6 +869,102 @@ mod tests {
         let result = extract_date_from_filename("2024_12_25.jpg");
         assert!(result.is_some());
         assert_eq!(result.unwrap().date, "2024-12-25");
+    }
+
+    #[test]
+    fn test_extract_date_google_photos() {
+        let result = extract_date_from_filename("PXL_20240115_143000123.jpg");
+        assert!(result.is_some());
+        let ext = result.unwrap();
+        assert_eq!(ext.date, "2024-01-15");
+        assert_eq!(ext.time, Some("14:30:00".to_string()));
+        assert_eq!(ext.source, "Google Photos");
+    }
+
+    #[test]
+    fn test_extract_date_samsung() {
+        let result = extract_date_from_filename("2024-01-15 14.30.00.jpg");
+        assert!(result.is_some());
+        let ext = result.unwrap();
+        assert_eq!(ext.date, "2024-01-15");
+        assert_eq!(ext.time, Some("14:30:00".to_string()));
+        assert_eq!(ext.source, "Samsung");
+    }
+
+    #[test]
+    fn test_extract_date_windows_screenshot() {
+        let result = extract_date_from_filename("Screenshot 2024-01-15 143000.png");
+        assert!(result.is_some());
+        let ext = result.unwrap();
+        assert_eq!(ext.date, "2024-01-15");
+        assert_eq!(ext.time, Some("14:30:00".to_string()));
+        assert_eq!(ext.source, "Screenshot");
+    }
+
+    #[test]
+    fn test_format_exif_date() {
+        assert_eq!(format_exif_date("2024:01:15 14:30:00"), Some("2024-01-15".to_string()));
+        assert_eq!(format_exif_date("2024:01:15"), Some("2024-01-15".to_string()));
+        assert_eq!(format_exif_date("invalid"), None);
+        assert_eq!(format_exif_date("2024-01-15"), None); // Expects colons
+    }
+
+    #[test]
+    fn test_write_exif_date_if_missing_internal() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.jpg");
+        std::fs::File::create(&file_path).unwrap();
+
+        let mock_script = std::env::current_dir().unwrap().join("temp_test/mock_exiftool.sh");
+        
+        // We need to be careful with paths if we are in src-tauri
+        let mock_script = if mock_script.exists() {
+            mock_script
+        } else {
+             std::env::current_dir().unwrap().join("src-tauri/temp_test/mock_exiftool.sh")
+        };
+
+        if !mock_script.exists() {
+            // Skip if mock script not found (should be there in this environment)
+            return;
+        }
+
+        let result = write_exif_date_if_missing_internal(
+            &mock_script,
+            file_path.to_str().unwrap(),
+            "2024-01-15",
+            Some("14:30:00".to_string())
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "Date written: 2024:01:15 14:30:00");
+    }
+
+    #[test]
+    fn test_read_exif_metadata_internal() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.jpg");
+        std::fs::File::create(&file_path).unwrap();
+
+        let mock_script = std::env::current_dir().unwrap().join("temp_test/mock_exiftool_json.sh");
+        let mock_script = if mock_script.exists() {
+            mock_script
+        } else {
+             std::env::current_dir().unwrap().join("src-tauri/temp_test/mock_exiftool_json.sh")
+        };
+
+        if !mock_script.exists() {
+            return;
+        }
+
+        let result = read_exif_metadata_internal(&mock_script, file_path.to_str().unwrap());
+
+        assert!(result.is_ok());
+        let meta = result.unwrap();
+        assert_eq!(meta.date_time_original, Some("2024:01:15 14:30:00".to_string()));
+        assert_eq!(meta.make, Some("Apple".to_string()));
+        assert_eq!(meta.model, Some("iPhone 15".to_string()));
+        assert_eq!(meta.keywords, vec!["test".to_string()]);
     }
 
     #[test]

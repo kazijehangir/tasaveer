@@ -378,4 +378,56 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert!(result[0].contains("valid.zip"));
     }
+
+    #[test]
+    fn test_clean_staging() {
+        let dir = tempdir().unwrap();
+        let staging_path = dir.path().join("my-staging-area");
+        fs::create_dir_all(&staging_path).unwrap();
+        fs::File::create(staging_path.join("some-file.txt")).unwrap();
+        
+        assert!(staging_path.exists());
+        
+        let result = clean_staging(staging_path.to_string_lossy().to_string());
+        assert!(result.is_ok());
+        assert!(!staging_path.exists());
+    }
+
+    #[test]
+    fn test_clean_staging_safety() {
+        let dir = tempdir().unwrap();
+        let important_dir = dir.path().join("important-data");
+        fs::create_dir_all(&important_dir).unwrap();
+        
+        let result = clean_staging(important_dir.to_string_lossy().to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Safety check failed"));
+        assert!(important_dir.exists());
+    }
+
+    #[test]
+    fn test_copy_to_staging() {
+        // Skip if rsync is not available
+        if std::process::Command::new("rsync").arg("--version").output().is_err() {
+            return;
+        }
+
+        let dir = tempdir().unwrap();
+        let source_dir = dir.path().join("source");
+        let staging_dir = dir.path().join("staging");
+        
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::File::create(source_dir.join("test.txt")).unwrap();
+        
+        let result = copy_to_staging(
+            source_dir.to_string_lossy().to_string(),
+            staging_dir.to_string_lossy().to_string()
+        );
+        
+        assert!(result.is_ok());
+        let final_dest_str = result.unwrap();
+        let final_dest = std::path::Path::new(&final_dest_str);
+        assert!(final_dest.exists());
+        assert!(final_dest.join("test.txt").exists());
+    }
 }

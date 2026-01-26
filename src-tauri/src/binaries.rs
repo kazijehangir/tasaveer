@@ -74,4 +74,25 @@ mod tests {
             Err(e) => assert!(e.contains("exiftool")),
         }
     }
+
+    #[test]
+    fn test_discover_nonexistent() {
+        // Create a fake prerequisite just for testing
+        #[derive(Debug, Clone)]
+        struct FakePre;
+        impl FakePre {
+            fn name(&self) -> &str { "definitely_not_a_real_binary_12345" }
+            fn discover_in_path(&self) -> Result<PathBuf, String> {
+                match which(self.name()) {
+                    Ok(path) => Ok(path),
+                    Err(_) => Err(format!("Could not find '{}'", self.name())),
+                }
+            }
+        }
+        
+        let fake = FakePre {};
+        let result = fake.discover_in_path();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("definitely_not_a_real_binary_12345"));
+    }
 }
