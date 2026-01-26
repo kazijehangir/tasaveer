@@ -34,6 +34,7 @@ exiftool = "0.3.0"
 tauri-plugin-store = "2.4.2"
 which = "8.0.0"
 sha2 = "0.10"
+lazy_static = "1"
 
 [dev-dependencies]
 tempfile = "3"

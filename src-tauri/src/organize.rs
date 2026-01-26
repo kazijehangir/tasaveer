@@ -14,7 +14,7 @@ use tauri::Emitter;
 use walkdir::WalkDir;
 
 /// Media extensions we support
-const MEDIA_EXTENSIONS: &[&str] = &[
+pub const MEDIA_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "heic", "heif", "webp", "gif", "bmp", "tiff", "tif", "raw", "cr2", "nef",
     "arw", "dng", "mp4", "mov", "avi", "mkv", "m4v", "webm", "3gp", "wmv", "flv",
 ];

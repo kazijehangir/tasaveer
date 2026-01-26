@@ -4007,6 +4007,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "exiftool",
+ "lazy_static",
  "regex",
  "reqwest 0.11.27",
  "serde",

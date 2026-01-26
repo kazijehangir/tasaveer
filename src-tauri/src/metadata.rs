@@ -5,9 +5,24 @@
 //! - Extract dates from filename patterns (WhatsApp, screenshots, etc.)
 //! - Read and write EXIF metadata safely (never overwriting valid data)
 
+use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::process::Command;
+
+lazy_static! {
+    static ref WHATSAPP_ANDROID_RE: Regex = Regex::new(r"IMG-(\d{4})(\d{2})(\d{2})-WA").unwrap();
+    static ref WHATSAPP_IOS_RE: Regex =
+        Regex::new(r"WhatsApp.*(\d{4})-(\d{2})-(\d{2})(?:\s+at\s+(\d{2})\.(\d{2})\.(\d{2}))?")
+            .unwrap();
+    static ref SCREENSHOT_MAC_RE: Regex =
+        Regex::new(r"Screenshot\s+(\d{4})-(\d{2})-(\d{2})\s+at\s+(\d{2})\.(\d{2})\.(\d{2})")
+            .unwrap();
+    static ref ANDROID_CAMERA_RE: Regex =
+        Regex::new(r"(?:IMG_)?(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})").unwrap();
+    static ref GENERIC_DATE_RE: Regex = Regex::new(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})").unwrap();
+}
 
 /// Represents extracted EXIF metadata from a file
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,8 +63,7 @@ pub struct FileMetadataInfo {
 /// - iOS Camera: IMG_20240115_143000.jpg
 pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     // WhatsApp Android: IMG-20240115-WA0042.jpg
-    let whatsapp_android = Regex::new(r"IMG-(\d{4})(\d{2})(\d{2})-WA").unwrap();
-    if let Some(caps) = whatsapp_android.captures(filename) {
+    if let Some(caps) = WHATSAPP_ANDROID_RE.captures(filename) {
         return Some(ExtractedDate {
             date: format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]),
             time: None,
@@ -58,10 +72,7 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     }
 
     // WhatsApp iOS: WhatsApp Image 2024-01-15 at 10.30.45
-    let whatsapp_ios =
-        Regex::new(r"WhatsApp.*(\d{4})-(\d{2})-(\d{2})(?:\s+at\s+(\d{2})\.(\d{2})\.(\d{2}))?")
-            .unwrap();
-    if let Some(caps) = whatsapp_ios.captures(filename) {
+    if let Some(caps) = WHATSAPP_IOS_RE.captures(filename) {
         let time = if caps.get(4).is_some() {
             Some(format!("{}:{}:{}", &caps[4], &caps[5], &caps[6]))
         } else {
@@ -75,10 +86,7 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     }
 
     // Screenshot Mac: Screenshot 2024-01-15 at 14.30.00
-    let screenshot_mac =
-        Regex::new(r"Screenshot\s+(\d{4})-(\d{2})-(\d{2})\s+at\s+(\d{2})\.(\d{2})\.(\d{2})")
-            .unwrap();
-    if let Some(caps) = screenshot_mac.captures(filename) {
+    if let Some(caps) = SCREENSHOT_MAC_RE.captures(filename) {
         return Some(ExtractedDate {
             date: format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]),
             time: Some(format!("{}:{}:{}", &caps[4], &caps[5], &caps[6])),
@@ -87,9 +95,7 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     }
 
     // Android Camera: 20240115_143000.jpg or IMG_20240115_143000.jpg
-    let android_camera =
-        Regex::new(r"(?:IMG_)?(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})").unwrap();
-    if let Some(caps) = android_camera.captures(filename) {
+    if let Some(caps) = ANDROID_CAMERA_RE.captures(filename) {
         let year: u32 = caps[1].parse().unwrap_or(0);
         let month: u32 = caps[2].parse().unwrap_or(0);
         let day: u32 = caps[3].parse().unwrap_or(0);
@@ -105,8 +111,7 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
     }
 
     // Generic date pattern: YYYY-MM-DD or YYYYMMDD anywhere in filename
-    let generic_date = Regex::new(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})").unwrap();
-    if let Some(caps) = generic_date.captures(filename) {
+    if let Some(caps) = GENERIC_DATE_RE.captures(filename) {
         let year: u32 = caps[1].parse().unwrap_or(0);
         let month: u32 = caps[2].parse().unwrap_or(0);
         let day: u32 = caps[3].parse().unwrap_or(0);
@@ -127,6 +132,15 @@ pub fn extract_date_from_filename(filename: &str) -> Option<ExtractedDate> {
 /// Read EXIF metadata from a file using exiftool
 #[tauri::command]
 pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
+    // Validate path before executing command
+    let path = Path::new(&file_path);
+    if !path.is_file() {
+        return Err(format!(
+            "Path does not exist or is not a file: {}",
+            file_path
+        ));
+    }
+
     let output = Command::new("exiftool")
         .args([
             "-json",
@@ -137,6 +151,7 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
             "-Software",
             "-Keywords",
             "-XPKeywords",
+            "-Subject",
             &file_path,
         ])
         .output()
@@ -177,6 +192,23 @@ pub fn read_exif_metadata(file_path: String) -> Result<ExifMetadata, String> {
                 if !trimmed.is_empty() && !keywords.contains(&trimmed) {
                     keywords.push(trimmed);
                 }
+            }
+        }
+    }
+    if let Some(subj) = data.get("Subject") {
+        if let Some(arr) = subj.as_array() {
+            for k in arr {
+                if let Some(s) = k.as_str() {
+                    let trimmed = s.trim().to_string();
+                    if !trimmed.is_empty() && !keywords.contains(&trimmed) {
+                        keywords.push(trimmed);
+                    }
+                }
+            }
+        } else if let Some(s) = subj.as_str() {
+            let trimmed = s.trim().to_string();
+            if !trimmed.is_empty() && !keywords.contains(&trimmed) {
+                keywords.push(trimmed);
             }
         }
     }
@@ -228,6 +260,15 @@ pub fn write_exif_date_if_missing(
     date: String,
     time: Option<String>,
 ) -> Result<String, String> {
+    // Validate path before executing command
+    let path = Path::new(&file_path);
+    if !path.is_file() {
+        return Err(format!(
+            "Path does not exist or is not a file: {}",
+            file_path
+        ));
+    }
+
     // First check if date already exists
     if let Ok(metadata) = read_exif_metadata(file_path.clone()) {
         if metadata.date_time_original.is_some() {
@@ -266,21 +307,22 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
         return Ok("No keywords to write".to_string());
     }
 
-    // First, read existing keywords
-    let existing_output = Command::new("exiftool")
-        .args(["-Keywords", "-s", "-s", "-s", &file_path])
-        .output()
-        .map_err(|e| format!("Failed to read existing keywords: {}", e))?;
+    // Validate path before executing command
+    let path = Path::new(&file_path);
+    if !path.is_file() {
+        return Err(format!(
+            "Path does not exist or is not a file: {}",
+            file_path
+        ));
+    }
 
-    let existing_keywords: std::collections::HashSet<String> = if existing_output.status.success() {
-        String::from_utf8_lossy(&existing_output.stdout)
-            .trim()
-            .split(", ")
-            .filter(|s| !s.is_empty())
-            .map(|s| s.trim().to_string())
-            .collect()
-    } else {
-        std::collections::HashSet::new()
+    // First, read existing keywords using our robust reader
+    let existing_keywords = match read_exif_metadata(file_path.clone()) {
+        Ok(metadata) => metadata
+            .keywords
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>(),
+        Err(_) => std::collections::HashSet::new(),
     };
 
     // Merge with new keywords, avoiding duplicates
@@ -299,9 +341,11 @@ pub fn write_exif_keywords(file_path: String, keywords: Vec<String>) -> Result<S
         .args([
             "-overwrite_original",
             "-P", // Preserve file modification date
-            &format!("-XPKeywords={}", keywords_str),
+            "-sep",
+            ", ", // Ensure lists are written correctly
             &format!("-Keywords={}", keywords_str),
-            &format!("-IPTC:Keywords={}", keywords_str),
+            &format!("-Subject={}", keywords_str), // Sync XMP
+            "-XPKeywords=", // Remove Windows-specific tag to avoid duplication
             &file_path,
         ])
         .output()
@@ -364,23 +408,10 @@ pub async fn scan_missing_dates(
             continue;
         }
 
-        // Check if it's an image or video
+        // Check if it's an image or video using shared extension list
         if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
             let ext_lower = ext.to_lowercase();
-            if !matches!(
-                ext_lower.as_str(),
-                "jpg"
-                    | "jpeg"
-                    | "png"
-                    | "heic"
-                    | "heif"
-                    | "webp"
-                    | "mp4"
-                    | "mov"
-                    | "avi"
-                    | "mkv"
-                    | "m4v"
-            ) {
+            if !crate::organize::MEDIA_EXTENSIONS.contains(&ext_lower.as_str()) {
                 continue;
             }
         } else {
@@ -587,5 +618,97 @@ mod tests {
         let result = extract_date_from_filename("20241225.jpg");
         assert!(result.is_some());
         assert_eq!(result.unwrap().date, "2024-12-25");
+    }
+
+    #[test]
+    fn test_merge_conflicting_keywords() {
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        // 1. Setup temp directory and file
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_keywords.jpg");
+        let path_str = file_path.to_string_lossy().to_string();
+
+        // Create a minimal valid JPEG with ExifTool-writable structure
+        // This is a minimal blank JPEG (1x1 pixel)
+        let minimal_jpg = [
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01,
+            0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43, 0x00, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xDB, 0x00, 0x43, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC0, 0x00, 0x11, 0x08,
+            0x00, 0x01, 0x00, 0x01, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
+            0xFF, 0xC4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x10, 0x01,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xC4, 0x00, 0x14,
+            0x11, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0xFF, 0xDA, 0x00, 0x0C, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03,
+            0x11, 0x00, 0x3F, 0x00, 0xFF, 0xD9,
+        ];
+
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(&minimal_jpg).unwrap();
+
+        // 2. Pollute metadata with conflicting tags
+        // IPTC:Keywords = "TagA"
+        // XPKeywords = "TagB;TagC"
+        // XMP:Subject = "TagD"
+        let status = Command::new("exiftool")
+            .args([
+                "-overwrite_original",
+                "-Keywords=TagA",
+                "-XPKeywords=TagB;TagC",
+                "-Subject=TagD",
+                &path_str,
+            ])
+            .status()
+            .expect("Failed to run exiftool setup");
+        assert!(status.success());
+
+        // 3. Call our function to write a NEW tag ("TagE") which should trigger the merge
+        let result = write_exif_keywords(path_str.clone(), vec!["TagE".to_string()]);
+        assert!(result.is_ok());
+
+        // 4. Verify results
+        // Read raw output to check fields individually
+        let output = Command::new("exiftool")
+            .args(["-json", "-Keywords", "-XPKeywords", "-Subject", &path_str])
+            .output()
+            .unwrap();
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&stdout).unwrap();
+        let data = &parsed[0];
+
+        // XPKeywords should be missing or empty
+        assert!(data.get("XPKeywords").is_none());
+
+        // Keywords and Subject should contain ALL tags (A, B, C, D, E)
+        let expected = vec!["TagA", "TagB", "TagC", "TagD", "TagE"];
+
+        let check_field = |field: &str| {
+            let val = data.get(field).unwrap();
+            let mut found: Vec<String> = if let Some(arr) = val.as_array() {
+                arr.iter()
+                    .map(|v| v.as_str().unwrap().to_string())
+                    .collect()
+            } else {
+                vec![val.as_str().unwrap().to_string()]
+            };
+            found.sort();
+            assert_eq!(found, expected, "Field {} mismatch", field);
+        };
+
+        check_field("Keywords");
+        check_field("Subject");
     }
 }
