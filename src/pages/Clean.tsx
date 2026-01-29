@@ -36,6 +36,7 @@ interface DuplicateFile {
     path: string;
     size: number;
     modified: string | null;
+    hash: string | null;
 }
 
 interface DuplicateGroup {
@@ -55,6 +56,7 @@ interface SimilarFile {
     width: number | null;
     height: number | null;
     similarity: number;
+    hash: string | null;
 }
 
 interface SimilarGroup {
@@ -657,9 +659,16 @@ export function Clean() {
                                                                 {file.path}
                                                             </span>
                                                         </div>
-                                                        {file.modified && (
-                                                            <span className="text-xs text-text-muted">{file.modified}</span>
-                                                        )}
+                                                        <div className="flex items-center gap-2">
+                                                            {file.hash && (
+                                                                <span className="text-xs font-mono text-text-muted bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded" title={`Hash: ${file.hash}`}>
+                                                                    #{file.hash.substring(0, 8)}
+                                                                </span>
+                                                            )}
+                                                            {file.modified && (
+                                                                <span className="text-xs text-text-muted">{file.modified}</span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -796,6 +805,11 @@ export function Clean() {
                                                                 {formatBytes(file.size)}
                                                                 {file.width && file.height && ` • ${file.width}×${file.height}`}
                                                             </p>
+                                                            {file.hash && (
+                                                                <p className="text-[10px] text-text-muted font-mono truncate" title={file.hash}>
+                                                                    #{file.hash.substring(0, 8)}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}

@@ -23,6 +23,7 @@ pub struct DuplicateFile {
     pub path: String,
     pub size: u64,
     pub modified: Option<String>,
+    pub hash: Option<String>,
 }
 
 /// Represents a group of similar images
@@ -40,6 +41,7 @@ pub struct SimilarFile {
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub similarity: u32, // Similarity difference (0 = identical, higher = more different)
+    pub hash: Option<String>,
 }
 
 /// Result of a dedup scan
@@ -251,6 +253,10 @@ fn parse_duplicate_json(json: &str) -> Result<DedupResult, String> {
                                 .unwrap_or("")
                                 .to_string();
                             let size = file.get("size").and_then(|s| s.as_u64()).unwrap_or(0);
+                            let hash = file
+                                .get("hash")
+                                .and_then(|h| h.as_str())
+                                .map(|h| h.to_string());
                             let modified =
                                 file.get("modified_date")
                                     .and_then(|m| m.as_i64())
@@ -270,6 +276,7 @@ fn parse_duplicate_json(json: &str) -> Result<DedupResult, String> {
                                 path,
                                 size,
                                 modified,
+                                hash,
                             });
                         }
 
@@ -328,6 +335,10 @@ fn parse_similar_json(json: &str) -> Result<SimilarResult, String> {
                         .map(|h| h as u32);
                     let similarity =
                         file.get("similarity").and_then(|s| s.as_u64()).unwrap_or(0) as u32;
+                    let hash = file
+                        .get("hash")
+                        .and_then(|h| h.as_str())
+                        .map(|h| h.to_string());
 
                     if similarity > max_similarity {
                         max_similarity = similarity;
@@ -339,6 +350,7 @@ fn parse_similar_json(json: &str) -> Result<SimilarResult, String> {
                         width,
                         height,
                         similarity,
+                        hash,
                     });
                 }
 
@@ -402,6 +414,8 @@ mod tests {
         assert_eq!(result.total_groups, 1);
         assert_eq!(result.duplicates[0].files.len(), 2);
         assert_eq!(result.total_wasted_space, 1000);
+        // Verify hash parsing
+        assert_eq!(result.duplicates[0].files[0].hash.as_deref(), Some("abc"));
     }
 
     #[test]
