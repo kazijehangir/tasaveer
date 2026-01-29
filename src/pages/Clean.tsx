@@ -84,7 +84,7 @@ interface DedupProgress {
 type TabType = "metadata" | "duplicates" | "similar";
 
 export function Clean() {
-    const [activeTab, setActiveTab] = useState<TabType>("metadata");
+    const [activeTab, setActiveTab] = useState<TabType>("duplicates");
     const [archivePath, setArchivePath] = useState<string | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [czkawkaStatus, setCzkawkaStatus] = useState<string | null>(null);
@@ -357,30 +357,10 @@ export function Clean() {
                         Change
                     </button>
                 </div>
-                {czkawkaStatus && (
-                    <div className="mt-4 text-xs text-text-muted flex items-center gap-2">
-                        {czkawkaStatus.includes("found") ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                        ) : (
-                            <AlertCircle className="w-4 h-4 text-yellow-500" />
-                        )}
-                        {czkawkaStatus}
-                    </div>
-                )}
             </div>
 
             {/* Tab Navigation */}
             <div className="flex gap-2">
-                <button
-                    onClick={() => setActiveTab("metadata")}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "metadata"
-                        ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/50"
-                        : "bg-surface-secondary text-text-muted hover:text-text-main border border-transparent"
-                        }`}
-                >
-                    <Calendar className="w-4 h-4" />
-                    Fix Metadata
-                </button>
                 <button
                     onClick={() => setActiveTab("duplicates")}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "duplicates"
@@ -401,6 +381,16 @@ export function Clean() {
                     <Images className="w-4 h-4" />
                     Similar Images
                 </button>
+                <button
+                    onClick={() => setActiveTab("metadata")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "metadata"
+                        ? "bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/50"
+                        : "bg-surface-secondary text-text-muted hover:text-text-main border border-transparent"
+                        }`}
+                >
+                    <Calendar className="w-4 h-4" />
+                    Fix Dates
+                </button>
             </div>
 
             {/* Tab Content */}
@@ -410,7 +400,7 @@ export function Clean() {
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-bold flex items-center gap-2 text-text-main">
                                 <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                                Metadata Fixer
+                                Dates Fixer
                             </h2>
                             <div className="flex items-center gap-4">
                                 <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">

@@ -1,4 +1,4 @@
-import { FolderOpen, Server, Key, Package, XCircle, CheckCircle2, Save, RefreshCw, AlertTriangle, ExternalLink, Sun, Moon } from "lucide-react";
+import { FolderOpen, HardDrive, Server, Key, Package, XCircle, CheckCircle2, Save, RefreshCw, AlertTriangle, ExternalLink, Sun, Moon } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -8,6 +8,7 @@ import { useUIStore } from "../store/uiStore";
 
 interface SettingsData {
   archivePath: string;
+  defaultSourcePath: string;
   immichUrl: string;
   immichApiKey: string;
   // Custom binary path overrides (empty = use bundled/PATH)
@@ -30,6 +31,7 @@ export function Settings() {
   const { theme, setTheme } = useUIStore();
   const [settings, setSettings] = useState<SettingsData>({
     archivePath: "",
+    defaultSourcePath: "",
     immichUrl: "",
     immichApiKey: "",
     exiftoolPath: "",
@@ -112,18 +114,18 @@ export function Settings() {
     });
   };
 
-  const handleBrowse = async () => {
+  const handleBrowsePath = async (key: keyof SettingsData, title: string) => {
     try {
       const selected = await openDialog({
         directory: true,
         multiple: false,
-        title: "Select Archive Folder",
+        title,
       });
       if (selected) {
-        setSettings(prev => ({ ...prev, archivePath: selected as string }));
+        setSettings(prev => ({ ...prev, [key]: selected as string }));
       }
     } catch (err) {
-      console.error("Failed to list files", err);
+      console.error("Failed to select directory", err);
     }
   };
 
@@ -394,6 +396,42 @@ export function Settings() {
         </div>
       </div>
 
+      {/* Source Configuration */}
+      <div className="glass-card p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 rounded-lg bg-green-500/20">
+            <HardDrive className="w-5 h-5 text-green-400" />
+          </div>
+          <h2 className="text-2xl font-bold">Source Configuration</h2>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-text-muted">
+              Default Source Path
+            </label>
+            <p className="text-sm text-text-muted mb-2">
+              The default folder to ingest media from (e.g. SD card, Phone backup)
+            </p>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                className="input-field flex-1"
+                placeholder="/Volumes/SD_CARD"
+                value={settings.defaultSourcePath}
+                onChange={(e) => handleChange('defaultSourcePath', e.target.value)}
+              />
+              <button
+                onClick={() => handleBrowsePath('defaultSourcePath', 'Select Default Source Folder')}
+                className="btn-secondary whitespace-nowrap px-6"
+              >
+                Browse
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Archive Configuration */}
       <div className="glass-card p-8">
         <div className="flex items-center gap-3 mb-6">
@@ -420,7 +458,7 @@ export function Settings() {
                 onChange={(e) => handleChange('archivePath', e.target.value)}
               />
               <button
-                onClick={handleBrowse}
+                onClick={() => handleBrowsePath('archivePath', 'Select Archive Folder')}
                 className="btn-secondary whitespace-nowrap px-6"
               >
                 Browse

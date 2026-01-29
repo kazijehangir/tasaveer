@@ -224,6 +224,12 @@ export function Ingest() {
         if (archivePathValue) {
           setDestPath(archivePathValue);
         }
+        
+        const defaultSourcePath = await store.get<string>('defaultSourcePath');
+        if (defaultSourcePath) {
+          setSourcePath(defaultSourcePath);
+        }
+
         const savedTags = await store.get<SourceTag[]>('sourceTags');
         if (savedTags) {
           setSourceTags(savedTags);
@@ -565,7 +571,7 @@ export function Ingest() {
                     <p className="text-sm font-medium break-all text-text-main" title={sourcePath} data-testid="source-path-display">{sourcePath}</p>
                   </div>
                 </div>
-                <button onClick={() => setSourcePath(null)} className="p-2 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded-lg text-text-muted hover:text-text-main transition-colors shrink-0 ml-2">
+                <button onClick={handleSelectSource} className="p-2 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded-lg text-text-muted hover:text-text-main transition-colors shrink-0 ml-2">
                   Change
                 </button>
               </div>

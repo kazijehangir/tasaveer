@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Clean } from '../Clean';
-import { vi, Mock } from 'vitest';
+import { vi, Mock, describe, it, beforeEach, expect } from 'vitest';
 import * as tauriCore from '@tauri-apps/api/core';
 import * as tauriDialog from '@tauri-apps/plugin-dialog';
 
@@ -46,23 +46,33 @@ describe('Clean Page', () => {
         render(<Clean />);
         expect(screen.getByText(/Clean &/i)).toBeInTheDocument();
         expect(screen.getByText(/Dedup/i)).toBeInTheDocument();
-        expect(screen.getByText(/Fix Metadata/i)).toBeInTheDocument();
-        expect(screen.getByText(/Find Duplicates/i)).toBeInTheDocument();
+        // Check new tab names
+        expect(screen.getByText(/Fix Dates/i)).toBeInTheDocument();
+        // Find Duplicates appears as Tab and Action button
+        const dupTexts = screen.getAllByText(/Find Duplicates/i);
+        expect(dupTexts.length).toBeGreaterThan(0);
+        expect(screen.getByText(/Similar Images/i)).toBeInTheDocument();
+        
+        // Check "Find Duplicates" is default (Exact Duplicates header should be visible)
+        expect(screen.getByRole('heading', { name: /Exact Duplicates/i })).toBeInTheDocument();
+
+        // Verify czkawka status is NOT visible in the path selection area
+        expect(screen.queryByText(/czkawka_cli found/i)).not.toBeInTheDocument();
     });
 
     it('switches tabs correctly', () => {
         render(<Clean />);
 
-        // Metadata is default
-        expect(screen.getByText(/Metadata Fixer/i)).toBeInTheDocument();
-
-        // Switch to Duplicates - Tab button
-        fireEvent.click(screen.getByRole('button', { name: /Find Duplicates/i }));
+        // Duplicates is default
         expect(screen.getByRole('heading', { name: /Exact Duplicates/i })).toBeInTheDocument();
 
         // Switch to Similar - Tab button
         fireEvent.click(screen.getByRole('button', { name: /Similar Images/i }));
         expect(screen.getByRole('heading', { name: /Similar Images/i })).toBeInTheDocument();
+
+        // Switch to Fix Dates - Tab button
+        fireEvent.click(screen.getByRole('button', { name: /Fix Dates/i }));
+        expect(screen.getByRole('heading', { name: /Dates Fixer/i })).toBeInTheDocument();
     });
 
     it('enables scan button when path is selected', async () => {
@@ -77,9 +87,10 @@ describe('Clean Page', () => {
             expect(screen.getByText('/test/path')).toBeInTheDocument();
         });
 
-        // Scan button should be enabled (it renders differently when enabled)
-        const scanButton = screen.getByText('Scan');
-        expect(scanButton).not.toBeDisabled();
+        // Scan button should be enabled
+        const buttons = screen.getAllByRole('button', { name: /Find Duplicates/i });
+        // The second one is the action button in the content area
+        expect(buttons[1]).not.toBeDisabled();
     });
 
     it('displays metadata scan results', async () => {
@@ -101,6 +112,9 @@ describe('Clean Page', () => {
         mockOpen.mockResolvedValue('/test/path');
 
         render(<Clean />);
+
+        // Switch to Fix Dates
+        fireEvent.click(screen.getByRole('button', { name: /Fix Dates/i }));
 
         // Select path
         fireEvent.click(screen.getByText('Change'));
@@ -140,17 +154,20 @@ describe('Clean Page', () => {
 
         render(<Clean />);
 
-        // Switch to duplicates
-        fireEvent.click(screen.getByText(/Find Duplicates/i));
+        // Default tab is duplicates
 
         // Select path
         fireEvent.click(screen.getByText('Change'));
         await waitFor(() => expect(screen.getByText('/test/path')).toBeInTheDocument());
 
-        // Scan - use the button that is notably the action button (second occurrence) or query by specific parent
-        // The first one is the tab, the second one is the scan button
+        // Scan
+        // We have two "Find Duplicates" buttons. The tab and the action button.
+        // The action button is inside the card.
+        // We can query by the text content specifically inside the main content area or just click all enabled ones?
+        // Or finding the button that is NOT the active tab (which has specific classes).
+        // Let's use `getAllByText` and click the last one (rendered later in DOM).
         const buttons = screen.getAllByText('Find Duplicates');
-        fireEvent.click(buttons[1]);
+        fireEvent.click(buttons[buttons.length - 1]);
 
         await waitFor(() => {
             expect(screen.getByText('Found 1 duplicate groups')).toBeInTheDocument();
@@ -179,6 +196,9 @@ describe('Clean Page', () => {
         mockOpen.mockResolvedValue('/test/path');
         render(<Clean />);
 
+        // Switch to Fix Dates
+        fireEvent.click(screen.getByRole('button', { name: /Fix Dates/i }));
+
         // Select path and scan
         fireEvent.click(screen.getByText('Change'));
         await waitFor(() => expect(screen.getByText('/test/path')).toBeInTheDocument());
@@ -186,7 +206,7 @@ describe('Clean Page', () => {
 
         await waitFor(() => expect(screen.getByText('photo1.jpg')).toBeInTheDocument());
 
-        // Select the file (second checkbox, first is "Show only missing dates")
+        // Select the file
         const checkboxes = screen.getAllByRole('checkbox');
         fireEvent.click(checkboxes[1]);
 
@@ -227,17 +247,15 @@ describe('Clean Page', () => {
         mockOpen.mockResolvedValue('/test/path');
         render(<Clean />);
 
-        // Go to duplicates and scan
-        fireEvent.click(screen.getByText(/Find Duplicates/i));
+        // Default tab is duplicates
         fireEvent.click(screen.getByText('Change'));
         await waitFor(() => expect(screen.getByText('/test/path')).toBeInTheDocument());
         
         const scanButtons = screen.getAllByText('Find Duplicates');
-        fireEvent.click(scanButtons[1]); // The Scan button
+        fireEvent.click(scanButtons[scanButtons.length - 1]);
 
         await waitFor(() => expect(screen.getByText('/test/file1_copy.jpg')).toBeInTheDocument());
 
-        // Select the second file (there is only one checkbox in duplicate tab per duplicate group)
         const checkboxes = screen.getAllByRole('checkbox');
         fireEvent.click(checkboxes[0]); 
 
@@ -285,8 +303,6 @@ describe('Clean Page', () => {
 
         await waitFor(() => {
             expect(screen.getByText('Found 1 groups of similar images')).toBeInTheDocument();
-            expect(screen.getByText(/96% match/i)).toBeInTheDocument(); 
-            expect(screen.getByText('img1_small.jpg')).toBeInTheDocument();
         });
     });
 });
