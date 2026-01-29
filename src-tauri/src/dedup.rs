@@ -364,25 +364,10 @@ fn parse_similar_json(json: &str) -> Result<SimilarResult, String> {
 /// Delete files to system Trash (recoverable)
 #[tauri::command]
 pub fn delete_to_trash(files: Vec<String>) -> Result<String, String> {
-    let mut deleted = 0;
-    let mut errors = Vec::new();
-
-    for file in &files {
-        match trash::delete(file) {
-            Ok(_) => deleted += 1,
-            Err(e) => errors.push(format!("{}: {}", file, e)),
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(format!("Deleted {} files to Trash", deleted))
-    } else {
-        Err(format!(
-            "Deleted {} files, but {} failed: {}",
-            deleted,
-            errors.len(),
-            errors.join("; ")
-        ))
+    // Batch delete to avoid sequential "trash sound" and system hang on macOS
+    match trash::delete_all(&files) {
+        Ok(_) => Ok(format!("Deleted {} files to Trash", files.len())),
+        Err(e) => Err(format!("Failed to delete files: {}", e)),
     }
 }
 
