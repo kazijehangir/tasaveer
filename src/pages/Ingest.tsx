@@ -556,16 +556,16 @@ export function Ingest() {
               </div>
             ) : (
               <div className="p-4 rounded-xl bg-surface-secondary border border-green-500/30 flex items-center justify-between">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="p-2 rounded-lg bg-green-500/20 text-green-600 dark:text-green-400">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="p-2 rounded-lg bg-green-500/20 text-green-600 dark:text-green-400 shrink-0">
                     <CheckCircle2 className="w-5 h-5" />
                   </div>
-                  <div className="truncate">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs text-text-muted uppercase tracking-wider font-bold">Source</p>
-                    <p className="text-sm font-medium truncate text-text-main" title={sourcePath} data-testid="source-path-display">{sourcePath}</p>
+                    <p className="text-sm font-medium break-all text-text-main" title={sourcePath} data-testid="source-path-display">{sourcePath}</p>
                   </div>
                 </div>
-                <button onClick={() => setSourcePath(null)} className="p-2 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded-lg text-text-muted hover:text-text-main transition-colors">
+                <button onClick={() => setSourcePath(null)} className="p-2 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded-lg text-text-muted hover:text-text-main transition-colors shrink-0 ml-2">
                   Change
                 </button>
               </div>
@@ -720,8 +720,8 @@ export function Ingest() {
             {/* Destination Selector */}
             <div className="mb-6 p-4 rounded-xl bg-surface-secondary border border-border">
               <h3 className="text-sm font-semibold text-text-muted mb-2">Archive Destination</h3>
-              <div className="flex gap-2">
-                <div className="flex-1 truncate text-sm font-mono text-text-main bg-surface-elevated p-2 rounded border border-border" data-testid="dest-path-display">
+              <div className="flex gap-2 items-center">
+                <div className="flex-1 break-all text-sm font-mono text-text-main bg-surface-elevated p-2 rounded border border-border" data-testid="dest-path-display" title={destPath || "Not selected"}>
                   {destPath || "Not selected"}
                 </div>
                 <button onClick={handleSelectDest} className="p-2 bg-neutral-200 dark:bg-slate-700 hover:bg-neutral-300 dark:hover:bg-slate-600 rounded text-text-main">
