@@ -24,6 +24,7 @@ pub struct DuplicateFile {
     pub size: u64,
     pub modified: Option<String>,
     pub hash: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 /// Represents a group of similar images
@@ -42,6 +43,7 @@ pub struct SimilarFile {
     pub height: Option<u32>,
     pub similarity: u32, // Similarity difference (0 = identical, higher = more different)
     pub hash: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 /// Result of a dedup scan
@@ -153,7 +155,46 @@ pub async fn find_duplicates(
         )
     })?;
 
-    parse_duplicate_json(&json_content)
+    let mut result = parse_duplicate_json(&json_content)?;
+
+    // Enrich with tags (keywords) from EXIF
+    let _ = app_handle.emit(
+        "dedup-progress",
+        DedupProgress {
+            id: operation_id.clone(),
+            status: "Fetching metadata tags...".to_string(),
+        },
+    );
+
+    if let Ok(exiftool_path) = Prerequisite::ExifTool.discover(&app_handle) {
+        enrich_duplicates_with_tags(&mut result, &exiftool_path);
+    }
+
+    Ok(result)
+}
+
+fn enrich_duplicates_with_tags(result: &mut DedupResult, exiftool_path: &std::path::Path) {
+    use rayon::prelude::*;
+    
+    // Flatten the structure to a list of mutable references to files
+    // We can't easily iterate mutably over the nested structure in parallel directly 
+    // without some care, but we can iterate over groups in parallel.
+    
+    result.duplicates.par_iter_mut().for_each(|group| {
+        for file in &mut group.files {
+            // Check extension first to avoid unnecessary exiftool calls
+            let path = std::path::Path::new(&file.path);
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+            
+            if crate::organize::MEDIA_EXTENSIONS.contains(&ext.as_str()) {
+                 if let Ok(metadata) = crate::metadata::read_exif_metadata_internal(exiftool_path, &file.path) {
+                     if !metadata.keywords.is_empty() {
+                         file.tags = Some(metadata.keywords);
+                     }
+                 }
+            }
+        }
+    });
 }
 
 /// Find similar images using perceptual hash (async, cancellable)
@@ -214,7 +255,41 @@ pub async fn find_similar_images(
         )
     })?;
 
-    parse_similar_json(&json_content)
+    let mut result = parse_similar_json(&json_content)?;
+
+    // Enrich with tags
+    let _ = app_handle.emit(
+        "similar-progress",
+        DedupProgress {
+            id: operation_id.clone(),
+            status: "Fetching metadata tags...".to_string(),
+        },
+    );
+
+    if let Ok(exiftool_path) = Prerequisite::ExifTool.discover(&app_handle) {
+        enrich_similar_with_tags(&mut result, &exiftool_path);
+    }
+
+    Ok(result)
+}
+
+fn enrich_similar_with_tags(result: &mut SimilarResult, exiftool_path: &std::path::Path) {
+    use rayon::prelude::*;
+    
+    result.similar_groups.par_iter_mut().for_each(|group| {
+        for file in &mut group.files {
+            let path = std::path::Path::new(&file.path);
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+            
+            if crate::organize::MEDIA_EXTENSIONS.contains(&ext.as_str()) {
+                 if let Ok(metadata) = crate::metadata::read_exif_metadata_internal(exiftool_path, &file.path) {
+                     if !metadata.keywords.is_empty() {
+                         file.tags = Some(metadata.keywords);
+                     }
+                 }
+            }
+        }
+    });
 }
 
 /// Parse czkawka duplicate JSON output
@@ -277,6 +352,7 @@ fn parse_duplicate_json(json: &str) -> Result<DedupResult, String> {
                                 size,
                                 modified,
                                 hash,
+                                tags: None,
                             });
                         }
 
@@ -351,6 +427,7 @@ fn parse_similar_json(json: &str) -> Result<SimilarResult, String> {
                         height,
                         similarity,
                         hash,
+                        tags: None,
                     });
                 }
 
@@ -498,5 +575,76 @@ mod tests {
                 eprintln!("trash::delete failed (expected in some environments): {}", e);
             }
         }
+    }
+
+    #[test]
+    fn test_enrich_duplicates_with_tags() {
+        use std::io::Write;
+        use which::which;
+        
+        // Skip if exiftool not found
+        if which("exiftool").is_err() {
+            eprintln!("Skipping test_enrich_duplicates_with_tags: exiftool not found");
+            return;
+        }
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test_enrich.jpg");
+        let path_str = file_path.to_string_lossy().to_string();
+
+        // Create minimal valid JPEG
+        let minimal_jpg = [
+            0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01,
+            0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43, 0x00, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xDB, 0x00, 0x43, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC0, 0x00, 0x11, 0x08,
+            0x00, 0x01, 0x00, 0x01, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
+            0xFF, 0xC4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x10, 0x01,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xC4, 0x00, 0x14,
+            0x11, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0xFF, 0xDA, 0x00, 0x0C, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03,
+            0x11, 0x00, 0x3F, 0x00, 0xFF, 0xD9,
+        ];
+        std::fs::File::create(&file_path).unwrap().write_all(&minimal_jpg).unwrap();
+
+        // Write tag
+        let status = std::process::Command::new("exiftool")
+            .args(["-overwrite_original", "-Keywords=EnrichTest", &path_str])
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        // Create DedupResult
+        let mut result = DedupResult {
+            duplicates: vec![DuplicateGroup {
+                files: vec![DuplicateFile {
+                    path: path_str.clone(),
+                    size: 100,
+                    modified: None,
+                    hash: Some("abc".to_string()),
+                    tags: None,
+                }],
+                size_bytes: 100,
+            }],
+            total_groups: 1,
+            total_wasted_space: 0,
+        };
+
+        // Run enrichment
+        enrich_duplicates_with_tags(&mut result, std::path::Path::new("exiftool"));
+
+        // Verify
+        let tags = result.duplicates[0].files[0].tags.as_ref().unwrap();
+        assert!(tags.contains(&"EnrichTest".to_string()));
     }
 }

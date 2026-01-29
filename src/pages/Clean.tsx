@@ -37,6 +37,7 @@ interface DuplicateFile {
     size: number;
     modified: string | null;
     hash: string | null;
+    tags: string[] | null;
 }
 
 interface DuplicateGroup {
@@ -57,6 +58,7 @@ interface SimilarFile {
     height: number | null;
     similarity: number;
     hash: string | null;
+    tags: string[] | null;
 }
 
 interface SimilarGroup {
@@ -624,51 +626,62 @@ export function Clean() {
                                                 {group.files.map((file, fileIdx) => (
                                                     <div
                                                         key={file.path}
-                                                        className={`flex items-center justify-between p-2 rounded ${fileIdx === 0
+                                                        className={`p-2 rounded ${fileIdx === 0
                                                             ? "bg-green-500/10 border border-green-500/20"
                                                             : "bg-surface-secondary"
                                                             }`}
                                                     >
-                                                        <div className="flex items-center gap-3">
-                                                            {fileIdx > 0 && (
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedForDelete.has(file.path)}
-                                                                    onChange={(e) => {
-                                                                        const newSet = new Set(selectedForDelete);
-                                                                        if (e.target.checked) {
-                                                                            newSet.add(file.path);
-                                                                        } else {
-                                                                            newSet.delete(file.path);
-                                                                        }
-                                                                        setSelectedForDelete(newSet);
-                                                                    }}
-                                                                    className="rounded border-neutral-400 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
-                                                                />
-                                                            )}
-                                                            {fileIdx === 0 && (
-                                                                <span className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-2 py-0.5 rounded flex-shrink-0">
-                                                                    Keep
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                {fileIdx > 0 && (
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selectedForDelete.has(file.path)}
+                                                                        onChange={(e) => {
+                                                                            const newSet = new Set(selectedForDelete);
+                                                                            if (e.target.checked) {
+                                                                                newSet.add(file.path);
+                                                                            } else {
+                                                                                newSet.delete(file.path);
+                                                                            }
+                                                                            setSelectedForDelete(newSet);
+                                                                        }}
+                                                                        className="rounded border-neutral-400 dark:border-slate-600 text-primary-600 focus:ring-primary-500"
+                                                                    />
+                                                                )}
+                                                                {fileIdx === 0 && (
+                                                                    <span className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-2 py-0.5 rounded flex-shrink-0">
+                                                                        Keep
+                                                                    </span>
+                                                                )}
+                                                                <span
+                                                                    className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-text-main"
+                                                                    style={{ direction: 'rtl', textAlign: 'left' }}
+                                                                    title={file.path}
+                                                                >
+                                                                    {file.path}
                                                                 </span>
-                                                            )}
-                                                            <span
-                                                                className="text-sm overflow-hidden text-ellipsis whitespace-nowrap flex-1 text-text-main"
-                                                                style={{ direction: 'rtl', textAlign: 'left' }}
-                                                                title={file.path}
-                                                            >
-                                                                {file.path}
-                                                            </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {file.hash && (
+                                                                    <span className="text-xs font-mono text-text-muted bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded" title={`Hash: ${file.hash}`}>
+                                                                        #{file.hash.substring(0, 8)}
+                                                                    </span>
+                                                                )}
+                                                                {file.modified && (
+                                                                    <span className="text-xs text-text-muted">{file.modified}</span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            {file.hash && (
-                                                                <span className="text-xs font-mono text-text-muted bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded" title={`Hash: ${file.hash}`}>
-                                                                    #{file.hash.substring(0, 8)}
-                                                                </span>
-                                                            )}
-                                                            {file.modified && (
-                                                                <span className="text-xs text-text-muted">{file.modified}</span>
-                                                            )}
-                                                        </div>
+                                                        {file.tags && file.tags.length > 0 && (
+                                                            <div className="flex gap-1 mt-1 pl-9 flex-wrap">
+                                                                {file.tags.map(tag => (
+                                                                    <span key={tag} className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded-full border border-purple-200 dark:border-purple-800">
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
