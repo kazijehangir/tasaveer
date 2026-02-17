@@ -154,7 +154,7 @@ impl Default for SharedExifToolDaemon {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_daemon_read_metadata() {

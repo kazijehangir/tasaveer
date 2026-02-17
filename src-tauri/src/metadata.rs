@@ -341,9 +341,10 @@ fn parse_exif_metadata(data: &serde_json::Value, file_path: &str) -> ExifMetadat
 #[tauri::command]
 pub fn get_camera_model(
     app: tauri::AppHandle,
+    state: tauri::State<'_, crate::state::AppState>,
     file_path: String,
 ) -> Result<Option<String>, String> {
-    match read_exif_metadata(app, file_path) {
+    match read_exif_metadata(app, state, file_path) {
         Ok(metadata) => Ok(metadata.get_camera_model()),
         Err(_) => Ok(None), // No EXIF data is not an error for this function
     }
