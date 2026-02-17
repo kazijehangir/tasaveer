@@ -199,11 +199,25 @@ pub fn format_exif_date(date_str: &str) -> Option<String> {
 #[tauri::command]
 pub fn read_exif_metadata(
     app: tauri::AppHandle,
+    state: tauri::State<'_, crate::state::AppState>,
     file_path: String,
 ) -> Result<ExifMetadata, String> {
     let exiftool_path = crate::binaries::Prerequisite::ExifTool
         .discover(&app)
         .map_err(|e| format!("Failed to find exiftool: {}", e))?;
+
+    // Try to ensure daemon is running (non-blocking if already running)
+    let path_str = exiftool_path.to_str();
+    let _ = state.exiftool_daemon.ensure_started(path_str);
+
+    // Attempt read via daemon
+    if let Ok(json) = state.exiftool_daemon.read_metadata_json(&file_path) {
+         if let Ok(parsed) = serde_json::from_str::<Vec<serde_json::Value>>(&json) {
+            if !parsed.is_empty() {
+                return Ok(parse_exif_metadata(&parsed[0], &file_path));
+            }
+         }
+    }
 
     read_exif_metadata_internal(&exiftool_path, &file_path)
 }
@@ -368,7 +382,7 @@ pub async fn apply_tags_to_directory(
         .discover(&app_handle)
         .map_err(|e| format!("Failed to find exiftool: {}", e))?;
 
-    let daemon_available = state.exiftool_daemon.ensure_started(None).is_ok();
+    let daemon_available = state.exiftool_daemon.ensure_started(exiftool_path.to_str()).is_ok();
 
     let results = apply_tags_internal(
         Path::new(&path),
@@ -690,7 +704,7 @@ pub async fn scan_missing_dates(
         .map_err(|e| format!("Failed to find exiftool: {}", e))?;
 
     // Try to start the ExifTool daemon for batch processing
-    let daemon_res = state.exiftool_daemon.ensure_started(None);
+    let daemon_res = state.exiftool_daemon.ensure_started(exiftool_path.to_str());
     let daemon_available = daemon_res.is_ok();
     
     if daemon_available {
