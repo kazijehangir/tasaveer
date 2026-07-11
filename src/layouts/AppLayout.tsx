@@ -25,6 +25,7 @@ export function AppLayout() {
     if (path === "/") setActiveTab("dashboard");
     else if (path === "/ingest") setActiveTab("ingest");
     else if (path === "/clean") setActiveTab("cleanup");
+    else if (path === "/reconcile") setActiveTab("reconcile");
     else if (path === "/sync") setActiveTab("sync");
     else if (path === "/settings") setActiveTab("settings");
   }, [location.pathname]);
@@ -33,6 +34,7 @@ export function AppLayout() {
     setActiveTab(tabId);
     if (tabId === "dashboard") navigate("/");
     else if (tabId === "cleanup") navigate("/clean");
+    else if (tabId === "reconcile") navigate("/reconcile");
     else if (tabId === "settings") navigate("/settings");
     else navigate(`/${tabId}`);
   };

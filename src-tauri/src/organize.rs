@@ -21,7 +21,7 @@ use walkdir::WalkDir;
 /// destroy data (deleting a source file after a "duplicate" match), since the
 /// quick hash alone cannot rule out a collision between genuinely different
 /// files that happen to share their first 64KB and total size.
-fn compute_full_file_hash(path: &Path) -> Result<String, std::io::Error> {
+pub(crate) fn compute_full_file_hash(path: &Path) -> Result<String, std::io::Error> {
     let mut file = fs::File::open(path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 65536];
@@ -40,7 +40,7 @@ fn compute_full_file_hash(path: &Path) -> Result<String, std::io::Error> {
 ///
 /// On any failure (I/O error or hash mismatch) the possibly-partial
 /// destination file is removed; the source is never touched by this function.
-fn copy_and_verify(src: &Path, dst: &Path) -> Result<String, String> {
+pub(crate) fn copy_and_verify(src: &Path, dst: &Path) -> Result<String, String> {
     let copy_result = (|| -> Result<String, std::io::Error> {
         let mut source_file = fs::File::open(src)?;
         let mut dest_file = fs::File::create(dst)?;
@@ -771,6 +771,11 @@ impl Organizer {
                 dest_file = self.resolve_collision(&dest_file);
             }
 
+            // Enforce low disk space safeguard (5 GB min free)
+            if let Err(e) = crate::disk::check_disk_space(&self.dest_root, 5 * 1024 * 1024 * 1024) {
+                return Err(e);
+            }
+
             // Create directory
             if let Some(parent) = dest_file.parent() {
                 let _ = fs::create_dir_all(parent);
@@ -1053,6 +1058,9 @@ pub async fn run_unified_ingest(
 
     let source = Path::new(&source_path);
     let dest = Path::new(&dest_path);
+
+    // Enforce disk space safeguard at startup
+    crate::disk::check_disk_space(dest, 5 * 1024 * 1024 * 1024)?;
 
     // 1. Discovery phase
     let exiftool_path = crate::binaries::Prerequisite::ExifTool

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Layers, HardDrive, Settings, Upload } from 'lucide-react';
+import { Home, Layers, HardDrive, Settings, Upload, Scale } from 'lucide-react';
 import { useIngestStore, isProcessingStatus } from '../../store/ingestStore';
 
 interface SidebarProps {
@@ -16,6 +16,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         { id: 'dashboard', label: 'Home', icon: Home },
         { id: 'ingest', label: 'Ingest', icon: HardDrive },
         { id: 'cleanup', label: 'Clean & Dedup', icon: Layers },
+        { id: 'reconcile', label: 'Free Space', icon: Scale },
         { id: 'sync', label: 'Export', icon: Upload },
     ];
 

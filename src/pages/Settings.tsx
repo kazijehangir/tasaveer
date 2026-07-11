@@ -31,6 +31,7 @@ interface ImportSession {
 interface SettingsData {
   archivePath: string;
   defaultSourcePath: string;
+  backupPath: string;
   immichUrl: string;
   immichApiKey: string;
   // Custom binary path overrides (empty = use bundled/PATH)
@@ -54,6 +55,7 @@ export function Settings() {
   const [settings, setSettings] = useState<SettingsData>({
     archivePath: "",
     defaultSourcePath: "",
+    backupPath: "",
     immichUrl: "",
     immichApiKey: "",
     exiftoolPath: "",
@@ -526,6 +528,30 @@ export function Settings() {
               />
               <button
                 onClick={() => handleBrowsePath('archivePath', 'Select Archive Folder')}
+                className="btn-secondary whitespace-nowrap px-6"
+              >
+                Browse
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-4 border-t border-border-main/20">
+            <label className="block text-sm font-medium text-text-muted">
+              Google Drive Backup Path
+            </label>
+            <p className="text-sm text-text-muted mb-2">
+              Folder inside your Google Drive mount where media will be mirrored
+            </p>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                className="input-field flex-1"
+                placeholder="/Users/username/Library/CloudStorage/GoogleDrive-.../Nikon Photos/Nikon Imports"
+                value={settings.backupPath}
+                onChange={(e) => handleChange('backupPath', e.target.value)}
+              />
+              <button
+                onClick={() => handleBrowsePath('backupPath', 'Select Google Drive Backup Folder')}
                 className="btn-secondary whitespace-nowrap px-6"
               >
                 Browse

@@ -6,6 +6,7 @@ import { Sync } from "./pages/Sync";
 import { Clean } from "./pages/Clean";
 
 import { Settings } from "./pages/Settings";
+import { Reconcile } from "./pages/Reconcile";
 
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="ingest" element={<Ingest />} />
           <Route path="clean" element={<Clean />} />
+          <Route path="reconcile" element={<Reconcile />} />
           <Route path="sync" element={<Sync />} />
           <Route path="settings" element={<Settings />} />
         </Route>

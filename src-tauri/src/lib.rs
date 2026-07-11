@@ -8,6 +8,8 @@ mod exiftool_daemon;
 mod metadata;
 mod organize;
 mod state; // Add state module
+pub mod disk;
+pub mod reconcile;
 
 use state::AppState; // Import AppState
 use tauri_plugin_shell::ShellExt;
@@ -299,6 +301,12 @@ pub fn run() {
             organize::preview_organize,
             organize::run_organize,
             organize::run_unified_ingest,
+            // Reconcile commands
+            reconcile::run_reconcile,
+            reconcile::backup_at_risk,
+            reconcile::free_local_space,
+            reconcile::deep_verify_folder,
+            reconcile::seed_catalog_from_reconcile,
             // Catalog commands
             catalog::get_catalog_path,
             catalog::get_catalog_stats,
