@@ -54,6 +54,7 @@ interface OrganizePreview {
   will_organize: number;
   will_skip: number;
   duplicates: number;
+  already_imported: number;
 }
 
 interface TagProgress {
@@ -263,7 +264,7 @@ export function Ingest() {
         destPath,
       });
       setPreviewData(result);
-      addToLogs(`Preview complete: ${result.will_organize} to organize, ${result.will_skip} skipping, ${result.duplicates} duplicates.`);
+      addToLogs(`Preview complete: ${result.will_organize} to organize, ${result.will_skip} skipping, ${result.duplicates} duplicates, ${result.already_imported} already imported.`);
       setStatus('idle');
     } catch (err) {
       console.error("Preview failed:", err);
@@ -813,7 +814,7 @@ export function Ingest() {
                 <h3 className="text-sm font-bold text-primary-800 dark:text-primary-200 mb-3 flex items-center gap-2">
                   <Archive className="w-4 h-4" /> Preview Summary
                 </h3>
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-4 gap-2 text-center">
                   <div className="p-2 rounded-lg bg-surface-main/50">
                     <p className="text-xs text-text-muted uppercase font-bold mb-1">Organize</p>
                     <p className="text-lg font-bold text-text-main">{previewData.will_organize}</p>
@@ -825,6 +826,10 @@ export function Ingest() {
                   <div className="p-2 rounded-lg bg-surface-main/50">
                     <p className="text-xs text-text-muted uppercase font-bold mb-1">Dups</p>
                     <p className="text-lg font-bold text-text-main">{previewData.duplicates}</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-surface-main/50">
+                    <p className="text-xs text-text-muted uppercase font-bold mb-1">Already In</p>
+                    <p className="text-lg font-bold text-text-main">{previewData.already_imported}</p>
                   </div>
                 </div>
                 <p className="text-[10px] text-text-muted mt-3 text-center">

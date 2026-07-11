@@ -107,6 +107,7 @@ vi.mock('@tauri-apps/plugin-store', () => {
 vi.mock('@tauri-apps/plugin-opener', () => ({
     openUrl: vi.fn(() => Promise.resolve()),
     openPath: vi.fn(() => Promise.resolve()),
+    revealItemInDir: vi.fn(() => Promise.resolve()),
 }));
 
 // Mock Tauri event API

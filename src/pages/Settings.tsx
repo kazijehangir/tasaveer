@@ -1,10 +1,32 @@
-import { FolderOpen, HardDrive, Server, Key, Package, XCircle, CheckCircle2, Save, RefreshCw, AlertTriangle, ExternalLink, Sun, Moon } from "lucide-react";
+import { FolderOpen, HardDrive, Server, Key, Package, XCircle, CheckCircle2, Save, RefreshCw, AlertTriangle, ExternalLink, Sun, Moon, Database, ChevronDown, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { load, type Store } from "@tauri-apps/plugin-store";
 import { useUIStore } from "../store/uiStore";
+
+interface CatalogStats {
+  total_files: number;
+  pending_backups: number;
+  last_import_at: string | null;
+}
+
+interface ImportSession {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  source_path: string;
+  source_label: string | null;
+  dest_path: string;
+  backup_path: string | null;
+  total_files: number;
+  imported: number;
+  skipped_duplicates: number;
+  skipped_no_date: number;
+  errors: number;
+  status: string;
+}
 
 interface SettingsData {
   archivePath: string;
@@ -155,6 +177,51 @@ export function Settings() {
       setSaveMessage({ type: 'error', text: "Failed to save settings." });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Import catalog inspector - collapsed by default, loaded lazily on first expand
+  const [catalogExpanded, setCatalogExpanded] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogPath, setCatalogPath] = useState<string | null>(null);
+  const [catalogStats, setCatalogStats] = useState<CatalogStats | null>(null);
+  const [catalogSessions, setCatalogSessions] = useState<ImportSession[]>([]);
+
+  const loadCatalogInfo = async () => {
+    setCatalogLoading(true);
+    setCatalogError(null);
+    try {
+      const [path, stats, sessions] = await Promise.all([
+        invoke<string>("get_catalog_path"),
+        invoke<CatalogStats>("get_catalog_stats"),
+        invoke<ImportSession[]>("get_recent_sessions", { limit: 10 }),
+      ]);
+      setCatalogPath(path);
+      setCatalogStats(stats);
+      setCatalogSessions(sessions);
+    } catch (err) {
+      console.error("Failed to load catalog info:", err);
+      setCatalogError(err as string);
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
+  const handleToggleCatalog = () => {
+    const next = !catalogExpanded;
+    setCatalogExpanded(next);
+    if (next && !catalogStats) {
+      loadCatalogInfo();
+    }
+  };
+
+  const handleRevealCatalog = async () => {
+    if (!catalogPath) return;
+    try {
+      await revealItemInDir(catalogPath);
+    } catch (err) {
+      console.error("Failed to reveal catalog file:", err);
     }
   };
 
@@ -700,6 +767,122 @@ export function Settings() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Advanced: Import Catalog Inspector (collapsed by default) */}
+      <div className="glass-card p-8">
+        <button
+          onClick={handleToggleCatalog}
+          className="w-full flex items-center gap-3 text-left"
+          data-testid="catalog-toggle"
+        >
+          <div className="p-2 rounded-lg bg-indigo-500/20">
+            <Database className="w-5 h-5 text-indigo-400" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold">Advanced: Import Catalog</h2>
+            <p className="text-sm text-text-muted">Inspect the database that tracks every file ever imported</p>
+          </div>
+          {catalogExpanded ? <ChevronDown className="w-5 h-5 text-text-muted" /> : <ChevronRight className="w-5 h-5 text-text-muted" />}
+        </button>
+
+        {catalogExpanded && (
+          <div className="mt-6 space-y-6 animate-fade-in">
+            {catalogLoading ? (
+              <div className="flex items-center gap-2 text-text-muted text-sm">
+                <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+                Loading catalog...
+              </div>
+            ) : catalogError ? (
+              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+                Failed to load catalog: {catalogError}
+              </div>
+            ) : (
+              <>
+                {/* File location */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-text-muted">Database File</label>
+                  <p className="text-sm text-text-muted mb-2 font-medium">
+                    Every imported file's hash, dates, and backup status live in this SQLite file.
+                    Open it with any SQLite browser (e.g. "DB Browser for SQLite") for full inspection.
+                  </p>
+                  <div className="flex gap-3">
+                    <div className="input-field flex-1 break-all font-mono text-xs flex items-center" data-testid="catalog-path">
+                      {catalogPath || "Unknown"}
+                    </div>
+                    <button
+                      onClick={handleRevealCatalog}
+                      disabled={!catalogPath}
+                      className="btn-secondary whitespace-nowrap px-4 disabled:opacity-50"
+                    >
+                      Reveal in Finder
+                    </button>
+                    <button
+                      onClick={loadCatalogInfo}
+                      className="btn-secondary whitespace-nowrap px-3"
+                      title="Refresh"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-xl bg-surface-secondary border border-border">
+                    <p className="text-xs text-text-muted uppercase font-bold mb-1">Files Cataloged</p>
+                    <p className="text-2xl font-bold text-text-main" data-testid="catalog-total-files">{catalogStats?.total_files ?? 0}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-surface-secondary border border-border">
+                    <p className="text-xs text-text-muted uppercase font-bold mb-1">Pending Backups</p>
+                    <p className="text-2xl font-bold text-text-main">{catalogStats?.pending_backups ?? 0}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-surface-secondary border border-border">
+                    <p className="text-xs text-text-muted uppercase font-bold mb-1">Last Import</p>
+                    <p className="text-sm font-semibold text-text-main mt-1">
+                      {catalogStats?.last_import_at ? new Date(catalogStats.last_import_at).toLocaleString() : "Never"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Recent sessions */}
+                <div>
+                  <h3 className="text-sm font-semibold text-text-muted mb-3">Recent Import Sessions</h3>
+                  {catalogSessions.length === 0 ? (
+                    <p className="text-sm text-text-muted">No imports recorded yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                      {catalogSessions.map((session) => (
+                        <div key={session.id} className="p-3 rounded-lg bg-surface-secondary border border-border text-sm">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-text-main">
+                              {session.source_label || session.source_path}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                              session.status === 'complete' ? 'bg-green-500/20 text-green-500' :
+                              session.status === 'cancelled' ? 'bg-yellow-500/20 text-yellow-500' :
+                              session.status === 'running' ? 'bg-blue-500/20 text-blue-500' :
+                              'bg-red-500/20 text-red-500'
+                            }`}>
+                              {session.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-text-muted mb-2">{new Date(session.started_at).toLocaleString()}</p>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
+                            <span>Imported: <strong className="text-text-main">{session.imported}</strong></span>
+                            <span>Duplicates: <strong className="text-text-main">{session.skipped_duplicates}</strong></span>
+                            <span>No date: <strong className="text-text-main">{session.skipped_no_date}</strong></span>
+                            {session.errors > 0 && <span>Errors: <strong className="text-red-400">{session.errors}</strong></span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Save Button */}

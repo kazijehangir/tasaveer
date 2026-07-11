@@ -1,6 +1,7 @@
 use std::fs;
 
 pub mod binaries;
+pub mod catalog;
 
 mod dedup;
 mod exiftool_daemon;
@@ -288,6 +289,10 @@ pub fn run() {
             organize::preview_organize,
             organize::run_organize,
             organize::run_unified_ingest,
+            // Catalog commands
+            catalog::get_catalog_path,
+            catalog::get_catalog_stats,
+            catalog::get_recent_sessions,
             verify_binary,
         ])
         .run(tauri::generate_context!())
