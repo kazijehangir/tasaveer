@@ -1,7 +1,40 @@
-import { Import, RefreshCw, Sparkles } from "lucide-react";
+import { Import, RefreshCw, Sparkles, Activity, CheckCircle2, AlertCircle, ArrowRight, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+
+interface ImportSession {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  source_path: string;
+  source_label: string | null;
+  dest_path: string;
+  backup_path: string | null;
+  total_files: number;
+  imported: number;
+  skipped_duplicates: number;
+  skipped_no_date: number;
+  errors: number;
+  status: string;
+}
 
 export function Dashboard() {
+  const [sessions, setSessions] = useState<ImportSession[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    invoke<ImportSession[]>("get_recent_sessions", { limit: 5 })
+      .then((data) => {
+        setSessions(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load recent sessions:", err);
+        setLoading(false);
+      });
+  }, []);
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Hero Section */}
@@ -16,8 +49,6 @@ export function Dashboard() {
           </p>
         </div>
       </div>
-
-
 
       {/* Workflow Section */}
       <div className="glass-card p-8">
@@ -76,13 +107,96 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Activity Section */}
       <div className="glass-card p-8">
-        <h2 className="text-2xl font-bold mb-6 text-text-main">Recent Activity</h2>
-        <div className="text-center py-8">
-          <p className="text-text-main font-medium">No recent activity</p>
-          <p className="text-text-muted text-sm mt-2">Your import and sync history will appear here</p>
-        </div>
+        <h2 className="text-2xl font-bold mb-6 text-text-main flex items-center gap-2">
+          <Activity className="w-6 h-6 text-primary-500" />
+          Recent Activity
+        </h2>
+
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
+          </div>
+        ) : sessions.length > 0 ? (
+          <div className="space-y-4">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className="p-4 rounded-xl bg-surface-secondary/50 border border-border hover:border-primary-500/20 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="mt-1">
+                    {session.status === "completed" ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    ) : session.status === "running" ? (
+                      <div className="w-5 h-5 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-yellow-500" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-text-main text-sm">
+                        Import from {session.source_label || session.source_path.split("/").pop() || "Source"}
+                      </span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          session.status === "completed"
+                            ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                            : session.status === "running"
+                            ? "bg-primary-500/10 text-primary-500 animate-pulse"
+                            : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                        }`}
+                      >
+                        {session.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-muted mt-1 truncate flex items-center gap-1">
+                      <span className="truncate max-w-[150px] md:max-w-[250px]" title={session.source_path}>{session.source_path}</span>
+                      <ArrowRight className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate max-w-[150px] md:max-w-[250px]" title={session.dest_path}>{session.dest_path}</span>
+                    </p>
+                    <div className="text-[10px] text-text-muted mt-2 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      <span>{new Date(session.started_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6 text-xs border-t md:border-t-0 pt-3 md:pt-0 border-border">
+                  <div className="text-center">
+                    <p className="font-semibold text-text-main">{session.imported}</p>
+                    <p className="text-[10px] text-text-muted">Imported</p>
+                  </div>
+                  {session.skipped_duplicates > 0 && (
+                    <div className="text-center">
+                      <p className="font-semibold text-yellow-600 dark:text-yellow-400">{session.skipped_duplicates}</p>
+                      <p className="text-[10px] text-text-muted">Duplicates</p>
+                    </div>
+                  )}
+                  {session.skipped_no_date > 0 && (
+                    <div className="text-center">
+                      <p className="font-semibold text-text-muted">{session.skipped_no_date}</p>
+                      <p className="text-[10px] text-text-muted">No Date</p>
+                    </div>
+                  )}
+                  {session.errors > 0 && (
+                    <div className="text-center">
+                      <p className="font-semibold text-red-500">{session.errors}</p>
+                      <p className="text-[10px] text-text-muted">Errors</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-text-main font-medium">No recent activity</p>
+            <p className="text-text-muted text-sm mt-2">Your import and sync history will appear here</p>
+          </div>
+        )}
       </div>
     </div>
   );

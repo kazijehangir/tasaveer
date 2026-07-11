@@ -444,13 +444,34 @@ export function Clean() {
 
                         {metadataResults.length > 0 && (
                             <>
-                                <div className="text-sm text-text-muted mb-4">
-                                    Found {filteredMetadata.length} files
-                                    {showOnlyMissing && ` missing dates`}
+                                <div className="text-sm text-text-muted mb-4 flex justify-between items-center">
+                                    <div>
+                                        Found {filteredMetadata.length} files
+                                        {showOnlyMissing && ` missing dates`}
+                                        {filesWithExtractedDate.length > 0 && (
+                                            <span className="text-green-600 dark:text-green-400 ml-2">
+                                                ({filesWithExtractedDate.length} can be fixed from filename)
+                                            </span>
+                                        )}
+                                    </div>
                                     {filesWithExtractedDate.length > 0 && (
-                                        <span className="text-green-600 dark:text-green-400 ml-2">
-                                            ({filesWithExtractedDate.length} can be fixed from filename)
-                                        </span>
+                                        <button
+                                            onClick={() => {
+                                                const allSelected = filesWithExtractedDate.every(f => selectedForFix.has(f.file_path));
+                                                if (allSelected) {
+                                                    const newSet = new Set(selectedForFix);
+                                                    filesWithExtractedDate.forEach(f => newSet.delete(f.file_path));
+                                                    setSelectedForFix(newSet);
+                                                } else {
+                                                    const newSet = new Set(selectedForFix);
+                                                    filesWithExtractedDate.forEach(f => newSet.add(f.file_path));
+                                                    setSelectedForFix(newSet);
+                                                }
+                                            }}
+                                            className="text-xs text-primary-500 hover:text-primary-600 font-medium transition-colors cursor-pointer"
+                                        >
+                                            {filesWithExtractedDate.every(f => selectedForFix.has(f.file_path)) ? "Deselect All" : "Select All Fixable"}
+                                        </button>
                                     )}
                                 </div>
 

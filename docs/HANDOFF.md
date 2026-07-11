@@ -97,6 +97,12 @@ Fully implemented local staging, cloud backup, and SD card reconciliation pipeli
 - Bumped app version from `0.1.0` to `1.0.0` across `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
 - Updated all lockfiles (`package-lock.json` and `src-tauri/Cargo.lock`) and verified all tests pass (101 Rust + 63 frontend).
 
+### GitHub Issue Cleanup & Fixes (shipped)
+- **Resolved Issue 2 (Recent activity on Homepage)**: Integrated the `get_recent_sessions` Tauri command into `Dashboard.tsx` to replace the static mock message with a dynamic list of recent import sessions (showing source, destination, status, timestamp, and imported/duplicate/missing date metrics).
+- **Resolved Issue 17 (Metadata Fixer Select All)**: Added a "Select All Fixable" / "Deselect All" button in the Dates Fixer metadata scanner to bulk-select all items resolved from filenames. Added full unit tests in `Clean.test.tsx`.
+- **Resolved Issue 20 (Broken Similar Images Preview)**: Enabled the `assetProtocol` in `src-tauri/tauri.conf.json` (with `$HOME/**` path scope) and set a strict Content Security Policy allowing the `asset:` scheme. Added the `protocol-asset` compiler feature in `Cargo.toml`. This allows local file previews in the WebView via `convertFileSrc`.
+- **Identified already resolved issues**: Confirmed `Issue 15` (ingest progress bar), `Issue 13` (NEF raw support), and `Issue 14` (video importing support) are already implemented and working.
+
 ---
 
 ## 3. NEXT UP: Google Drive Backup Sync (PR3)

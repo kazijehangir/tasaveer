@@ -221,6 +221,56 @@ describe('Clean Page', () => {
         });
     });
 
+    it('allows selecting/deselecting all fixable metadata files', async () => {
+        const mockResults = [
+            {
+                file_path: '/test/photo1.jpg',
+                has_date: false,
+                extracted_date: { date: '2023-01-01', time: '12:00:00', source: 'filename' },
+                camera_model: null
+            },
+            {
+                file_path: '/test/photo2.jpg',
+                has_date: false,
+                extracted_date: { date: '2023-01-02', time: '12:00:00', source: 'filename' },
+                camera_model: null
+            }
+        ];
+
+        const invoke = tauriCore.invoke as Mock;
+        invoke.mockImplementation((cmd) => {
+            if (cmd === 'scan_missing_dates') return Promise.resolve(mockResults);
+            return Promise.resolve();
+        });
+
+        mockOpen.mockResolvedValue('/test/path');
+        render(<Clean />);
+
+        // Switch to Fix Dates
+        fireEvent.click(screen.getByRole('button', { name: /Fix Dates/i }));
+
+        // Select path and scan
+        fireEvent.click(screen.getByText('Change'));
+        await waitFor(() => expect(screen.getByText('/test/path')).toBeInTheDocument());
+        fireEvent.click(screen.getByText('Scan'));
+
+        await waitFor(() => expect(screen.getByText('photo1.jpg')).toBeInTheDocument());
+        expect(screen.getByText('photo2.jpg')).toBeInTheDocument();
+
+        // Click Select All Fixable
+        const selectAllBtn = screen.getByRole('button', { name: /Select All Fixable/i });
+        fireEvent.click(selectAllBtn);
+
+        // Expect both photo1 and photo2 to be selected, showing fix button for 2 files
+        expect(screen.getByText(/Fix 2 Selected/i)).toBeInTheDocument();
+
+        // Click Deselect All
+        fireEvent.click(screen.getByRole('button', { name: /Deselect All/i }));
+
+        // Expect none to be selected, fix button should disappear
+        expect(screen.queryByText(/Fix 2 Selected/i)).not.toBeInTheDocument();
+    });
+
     it('allows deleting selected duplicates', async () => {
         const mockDupResults = {
             total_groups: 1,

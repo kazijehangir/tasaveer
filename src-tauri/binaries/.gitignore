@@ -19,5 +19,6 @@ _temp*/
 !exiftool-x86_64-pc-windows-msvc.exe
 
 # Keep the directory structure
+!czkawka_cli-*
 !.gitignore
 !README.md

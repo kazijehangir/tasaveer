@@ -30,6 +30,8 @@ vi.mock('@tauri-apps/api/core', () => ({
                 return Promise.resolve('Connected successfully!');
             case 'greet':
                 return Promise.resolve(`Hello, ${(args as { name: string })?.name}!`);
+            case 'get_recent_sessions':
+                return Promise.resolve([]);
             default:
                 return Promise.reject(new Error(`Unknown command: ${cmd}`));
         }

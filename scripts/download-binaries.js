@@ -50,7 +50,7 @@ const IMMICH_GO_MAPPINGS = {
 // ExifTool configuration
 // Windows uses standalone exe, macOS/Linux use Perl distribution
 // Downloads from SourceForge (official distribution)
-const EXIFTOOL_VERSION = '13.45';
+const EXIFTOOL_VERSION = '13.59';
 const EXIFTOOL_MAPPINGS = {
     'windows': {
         targetTriple: 'x86_64-pc-windows-msvc',
@@ -81,6 +81,28 @@ const EXIFTOOL_MAPPINGS = {
         url: `https://sourceforge.net/projects/exiftool/files/Image-ExifTool-${EXIFTOOL_VERSION}.tar.gz/download`,
         extract: 'tar.gz',
         perlBundle: true
+    }
+};
+
+// Czkawka configuration
+// Downloads precompiled binaries from GitHub releases
+const CZKAWKA_VERSION = '11.0.1';
+const CZKAWKA_MAPPINGS = {
+    'windows_czkawka_cli.exe': {
+        targetTriple: 'x86_64-pc-windows-msvc',
+        extension: '.exe'
+    },
+    'mac_czkawka_cli_x86_64': {
+        targetTriple: 'x86_64-apple-darwin',
+        extension: ''
+    },
+    'mac_czkawka_cli_arm64': {
+        targetTriple: 'aarch64-apple-darwin',
+        extension: ''
+    },
+    'linux_czkawka_cli_x86_64': {
+        targetTriple: 'x86_64-unknown-linux-gnu',
+        extension: ''
     }
 };
 
@@ -269,6 +291,21 @@ function getExifToolConfig(targetTriple) {
     return null;
 }
 
+function findFileRecursive(dir, predicate) {
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+            const found = findFileRecursive(fullPath, predicate);
+            if (found) return found;
+        } else if (predicate(file)) {
+            return fullPath;
+        }
+    }
+    return null;
+}
+
 async function downloadExifTool(targetTriples) {
     console.log(`📦 Downloading ExifTool v${EXIFTOOL_VERSION}...`);
 
@@ -298,7 +335,7 @@ async function downloadExifTool(targetTriples) {
 
             console.log(`   📂 Extracting...`);
 
-            const tempDir = path.join(BINARIES_DIR, '_temp_exiftool');
+            const tempDir = path.join(BINARIES_DIR, `_temp_exiftool_${targetTriple}`);
             if (!fs.existsSync(tempDir)) {
                 fs.mkdirSync(tempDir, { recursive: true });
             }
@@ -310,13 +347,13 @@ async function downloadExifTool(targetTriples) {
                         execSync(`powershell -command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`, { stdio: 'inherit' });
                     } else {
                         execSync(`unzip -o "${archivePath}" -d "${tempDir}"`, { stdio: 'inherit' });
+                        execSync(`chmod -R +w "${tempDir}"`);
                     }
 
                     // Find exiftool(-k).exe and rename it
-                    const files = fs.readdirSync(tempDir);
-                    const exeFile = files.find(f => f.includes('exiftool') && f.endsWith('.exe'));
-                    if (exeFile) {
-                        fs.copyFileSync(path.join(tempDir, exeFile), outputPath);
+                    const exeFilePath = findFileRecursive(tempDir, (f) => f.includes('exiftool') && f.endsWith('.exe'));
+                    if (exeFilePath) {
+                        fs.copyFileSync(exeFilePath, outputPath);
                     } else {
                         throw new Error('ExifTool exe not found in archive');
                     }
@@ -367,7 +404,15 @@ exec perl "${'${'}BUNDLE_DIR}/exiftool" "$@"
                 console.log(`   ✓ ${outputName} ready`);
             } finally {
                 // Cleanup
-                fs.rmSync(tempDir, { recursive: true, force: true });
+                try {
+                    fs.rmSync(tempDir, { recursive: true, force: true });
+                } catch (rmErr) {
+                    try {
+                        if (process.platform !== 'win32') {
+                            execSync(`rm -rf "${tempDir}"`);
+                        }
+                    } catch (e) {}
+                }
                 if (fs.existsSync(archivePath)) {
                     fs.unlinkSync(archivePath);
                 }
@@ -378,6 +423,47 @@ exec perl "${'${'}BUNDLE_DIR}/exiftool" "$@"
             const currentTriple = getCurrentTargetTriple();
             const isMacosBuild = process.argv.includes('--macos');
             if (targetTriple === currentTriple || (isMacosBuild && targetTriple.includes('apple-darwin'))) {
+                throw err;
+            }
+        }
+    }
+}
+
+async function downloadCzkawka(targetTriples) {
+    console.log(`📦 Downloading Czkawka CLI v${CZKAWKA_VERSION}...`);
+
+    for (const [assetName, config] of Object.entries(CZKAWKA_MAPPINGS)) {
+        if (!targetTriples.includes(config.targetTriple)) {
+            continue;
+        }
+
+        try {
+            const outputName = `czkawka_cli-${config.targetTriple}${config.extension}`;
+            const outputPath = path.join(BINARIES_DIR, outputName);
+
+            // Check if already exists
+            if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+                console.log(`   ✓ ${outputName} already exists, skipping`);
+                continue;
+            }
+
+            console.log(`   ⬇ Downloading ${assetName}...`);
+
+            const url = `https://github.com/qarmin/czkawka/releases/download/${CZKAWKA_VERSION}/${assetName}`;
+            await downloadFile(url, outputPath);
+
+            // Make executable on Unix
+            if (process.platform !== 'win32') {
+                fs.chmodSync(outputPath, 0o755);
+            }
+
+            console.log(`   ✓ ${outputName} ready`);
+        } catch (err) {
+            console.error(`   ❌ Failed to download Czkawka for ${config.targetTriple}:`, err.message);
+            // Only throw error if it is critical for the current platform/macos build
+            const currentTriple = getCurrentTargetTriple();
+            const isMacosBuild = process.argv.includes('--macos');
+            if (config.targetTriple === currentTriple || (isMacosBuild && config.targetTriple.includes('apple-darwin'))) {
                 throw err;
             }
         }
@@ -402,7 +488,8 @@ async function main() {
         // Get unique target triples from both mappings
         const immichGoTriples = Object.values(IMMICH_GO_MAPPINGS).map(m => m.targetTriple);
         const exifToolTriples = Object.values(EXIFTOOL_MAPPINGS).map(m => m.targetTriple);
-        targetTriples = [...new Set([...immichGoTriples, ...exifToolTriples])];
+        const czkawkaTriples = Object.values(CZKAWKA_MAPPINGS).map(m => m.targetTriple);
+        targetTriples = [...new Set([...immichGoTriples, ...exifToolTriples, ...czkawkaTriples])];
     } else if (downloadMacos) {
         console.log('📋 Mode: Download macOS platforms only\n');
         targetTriples = ['x86_64-apple-darwin', 'aarch64-apple-darwin'];
@@ -414,6 +501,7 @@ async function main() {
 
     await downloadImmichGo(targetTriples);
     await downloadExifTool(targetTriples);
+    await downloadCzkawka(targetTriples);
 
     console.log('\n✅ Done!');
 }
