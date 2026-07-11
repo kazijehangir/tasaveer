@@ -7,8 +7,9 @@ This directory contains platform-specific binaries that are bundled with Tasavee
 | Tool | Repository | Description |
 |------|-----------|-------------|
 | **immich-go** | [simulot/immich-go](https://github.com/simulot/immich-go) | CLI tool for uploading to Immich and extracting Google Photos/iCloud takeouts |
-| **phockup** | [ivandokov/phockup](https://github.com/ivandokov/phockup) | Media sorting tool based on EXIF data |
-| **ExifTool** | [exiftool.org](https://exiftool.org/) | Required by phockup for metadata extraction |
+| **ExifTool** | [exiftool.org](https://exiftool.org/) | EXIF metadata read/write (date extraction, tagging). Runs in persistent `-stay_open` mode. |
+
+> Note: media organization is done natively in Rust (`src-tauri/src/organize.rs`); the old `phockup` dependency has been removed.
 
 ## Downloading Binaries
 

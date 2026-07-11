@@ -3,102 +3,69 @@
 <!-- markdownlint-disable -->
 <img align="left" width="80" height="80" hspace="20" src="public/app-icon.png">
 
-Tasaveer (/t̪ə.sɑː.ˈʋiːɾ/, Urdu: تصاویر, lit. 'photographs') is a media management tool which simplifies the process of importing media from various sources (like SD cards, Google Photos Takeout, and iCloud Takeout) into an organized local archive.
+Tasaveer (/t̪ə.sɑː.ˈʋiːɾ/, Urdu: تصاویر, lit. 'photographs') is a desktop app for importing photos and videos from cameras, SD cards, and Takeout exports into a clean, deduplicated, date-organized local archive — and keeping that archive backed up and shareable.
 
 [![Tests](https://github.com/kazijehangir/tasaveer/actions/workflows/test.yml/badge.svg)](https://github.com/kazijehangir/tasaveer/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/kazijehangir/tasaveer/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/kazijehangir/tasaveer)
 
-## Features
+<br clear="left"/>
 
-- **Ingest Workflow**: Import media from various sources (local drive, Google Photos, iCloud).
-- **Smart Tagging**: Automatically file media by camera model or directory patterns during ingest.
-- **Import Strategies**:
-  - **Copy**: Safely duplicates files (keeps originals).
-  - **Move**: Transfers files and clears source (saves space).
-- **Deduplication**: Visual interface for `czkawka` to find and remove duplicates.
-- **Control**: Start and cancel operations safely at any time.
+## What it does
 
-## Workflow
+Tasaveer is built around the pipeline **SD card → local archive (for editing) → Google Drive (backup) → Immich / Google Photos (sharing)**. It's a Tauri app: a Rust backend does the heavy file work, a React frontend drives it.
 
-Tasaveer is designed around a 3-step workflow to ensure your media library is pristine before it reaches your permanent storage or Immich server.
+- **Ingest & organize** — Copy or move media from a folder (SD card / Takeout support in progress) into a `YYYY/YYYY-MM-DD` archive. Dates come from EXIF (`DateTimeOriginal`, falling back to `CreateDate` for videos) via a persistent ExifTool daemon, or from the filename. Copies are hash-verified.
+- **Deduplication that survives cleanup** — An import catalog (local SQLite) records every file ever imported by content hash, so re-importing the same card doesn't re-copy files even after you've cleared your working folder. Exact duplicates are skipped; a source is only ever deleted after a full-file hash match.
+- **Smart tagging** — Auto-tag files by camera model or source directory during ingest (written as EXIF keywords).
+- **Clean & dedup** — Visual interface over [`czkawka`](https://github.com/qarmin/czkawka) to find duplicate and visually-similar images; deletions go to the Trash.
+- **Safe by default** — Every long operation is cancellable and shows live progress; running operations survive navigating between tabs.
 
-![Tasaveer Home Dashboard](public/home-screenshot.png)
+The archive on disk is always the source of truth; the catalog is an auxiliary index that can be rebuilt.
 
-1. **Ingest & Tag**
-    Copy or move images and videos from sources like SD cards, Google Photos Takeout, or local folders. During this step, you can assign tags based on camera models or source directories to organize files automatically.
+## Status & roadmap
 
-    ![Ingest Workflow](public/ingest-screenshot.png)
+**Working today:** Ingest (copy/move, organize, verified copies, tagging), cross-session dedup via the import catalog, Clean & Dedup, and a catalog inspector in Settings.
 
-2. **Clean and Dedup**
-    find duplicate files and similar images using **Czkawka**. This step allows for stacking similar pictures and deduplicating lower-resolution copies.
+**In progress / planned** (see [`docs/HANDOFF.md`](docs/HANDOFF.md) and [`docs/sd-card-import-plan.md`](docs/sd-card-import-plan.md) for detail):
 
-3. **Sync to Immich**
-    Link the organized folders as External Libraries in Immich and trigger a library scan to update your cloud archive.
+- **Backup reconciliation** — figure out which local files are safely on Google Drive (without downloading anything), back up the ones that aren't, and reclaim local space by trashing confirmed-backed-up copies. *Next up.*
+- **Google Drive backup sync** — mirror new imports into a Drive folder and track backup status per file.
+- **SD card source** — detect a mounted card and import straight from `DCIM`, with eject-after-import.
+- **Sync to Immich** — wire the (currently stub) Sync screen to the bundled `immich-go`.
 
-    ![Sync Workflow](public/sync-screenshot.png)
+## Install & prerequisites
 
-## Installation and Prerequisites
+### Bundled dependencies
+**immich-go** and **ExifTool** ship with Tasaveer — no separate install needed.
 
-### Bundled Dependencies
-
-Tasaveer comes with **immich-go** and **ExifTool** bundled for core operations. No additional installation is typically required for these.
-
-### Czkawka (Required for Deduplication)
-
-For finding duplicate files and similar images, you need to install `czkawka_cli`.
-
-#### MacOS
+### Czkawka (required for deduplication)
+Install `czkawka_cli` for duplicate / similar-image scanning:
 
 ```bash
-# Install via Homebrew
+# macOS
 brew install czkawka
 ```
-
-#### Windows
-
-Download the `czkawka_cli` executable from [qarmin/czkawka](https://github.com/qarmin/czkawka/releases) and add it to your PATH, or specify its location in Settings.
-
-### Custom Binary Paths
-
-You can override the bundled or PATH binaries with your own custom installations in **Settings → Advanced: Custom Binary Paths**.
-
-![Settings Page](public/settings-screenshot.png)
-
-### External Dependencies Reference
+On Windows, download `czkawka_cli` from [qarmin/czkawka](https://github.com/qarmin/czkawka/releases) and add it to PATH, or set its location in **Settings → Advanced: Custom Binary Paths**.
 
 | Tool | Bundled | Repository |
 | --- | --- | --- |
-| **immich-go** | ✅ Yes | [simulot/immich-go](https://github.com/simulot/immich-go) |
-| **ExifTool** | ✅ Yes | [exiftool.org](https://exiftool.org/) |
-| **czkawka** | ❌ No | [qarmin/czkawka](https://github.com/qarmin/czkawka) |
+| immich-go | ✅ | [simulot/immich-go](https://github.com/simulot/immich-go) |
+| ExifTool | ✅ | [exiftool.org](https://exiftool.org/) |
+| czkawka | ❌ | [qarmin/czkawka](https://github.com/qarmin/czkawka) |
 
-## Developing Guide
+## Development
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Tauri v2 + React + TypeScript + Vite. See [`AGENTS.md`](AGENTS.md) for architecture and conventions.
 
-### Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
-
-### Windows Development Setup
-
-1. **Install Rust**:
-    - Download and run `rustup-init.exe` from [rust-lang.org](https://www.rust-lang.org/tools/install).
-    - Or use Winget: `winget install Rustlang.Rustup`.
-2. **C++ Build Tools**:
-    - Ensure "Desktop development with C++" is installed via Visual Studio Build Tools.
-
-### Running Tests
-
-Run all frontend tests:
+**Recommended setup:** [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer). On Windows, install Rust via `rustup` and the "Desktop development with C++" build tools.
 
 ```bash
-npm test              # Watch mode
-npm run test:coverage # With coverage report
-```
+npm install
+npm run tauri dev          # run the app
 
-Run Rust backend tests:
+npm test                   # frontend tests (watch)
+npm run test:coverage      # frontend tests + coverage
+npx tsc --noEmit           # type check
 
-```bash
-cargo test --manifest-path src-tauri/Cargo.toml --lib
+cargo test --manifest-path src-tauri/Cargo.toml --lib   # Rust tests
 ```

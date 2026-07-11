@@ -8,9 +8,12 @@ This document defines architectural patterns and context specific to the **Tasav
 
 ---
 
+> Canonical agent guidance now lives in [AGENTS.md](../../../AGENTS.md); current status and the next-feature spec are in [docs/HANDOFF.md](../../../docs/HANDOFF.md). This file is a thin architecture reminder.
+
 ## 🏗️ Core Philosophy
 
--   **File System as Source of Truth**: Tasaveer is a local media manager. We do **not** maintain a central database for media indexing. Metadata is read from and written directly to files or sidecars.
--   **Native Capabilities**: Use Rust for heavy file operations, metadata extraction (`exiftool`), and process orchestration. Use the React frontend for UI and state management.
+-   **File System as Source of Truth**: The archive on disk (and the EXIF metadata embedded in each file) is authoritative.
+-   **Auxiliary catalog, not authoritative**: an import catalog (SQLite, `src-tauri/src/catalog.rs`) indexes files by content hash for cross-session dedup and backup tracking. It is a rebuildable convenience — never the source of truth for media.
+-   **Native Capabilities**: Use Rust for heavy file operations, hashing, metadata extraction (`exiftool`), and process orchestration. Use the React frontend for UI and state.
 
 ---
