@@ -81,6 +81,20 @@ interface DedupProgress {
     status: string;
 }
 
+const getCanonicalFile = (files: SimilarFile[]): SimilarFile | null => {
+    if (files.length === 0) return null;
+    let canonical = files[0];
+    let maxRes = (canonical.width || 0) * (canonical.height || 0);
+    files.forEach(f => {
+        const res = (f.width || 0) * (f.height || 0);
+        if (res > maxRes) {
+            maxRes = res;
+            canonical = f;
+        }
+    });
+    return canonical;
+};
+
 type TabType = "metadata" | "duplicates" | "similar";
 
 export function Clean() {
@@ -100,6 +114,7 @@ export function Clean() {
 
     // Similar state
     const [similarResults, setSimilarResults] = useState<SimilarResult | null>(null);
+    const [selectedSimilarForDelete, setSelectedSimilarForDelete] = useState<Set<string>>(new Set());
 
     // Error state
     const [error, setError] = useState<string | null>(null);
@@ -268,12 +283,42 @@ export function Clean() {
             });
             console.log("Similar scan results:", results);
             setSimilarResults(results);
+
+            // Automatically select non-canonical files in each group
+            const initialSelection = new Set<string>();
+            results.similar_groups.forEach(group => {
+                const canonicalFile = getCanonicalFile(group.files);
+                if (canonicalFile) {
+                    group.files.forEach(file => {
+                        if (file.path !== canonicalFile.path) {
+                            initialSelection.add(file.path);
+                        }
+                    });
+                }
+            });
+            setSelectedSimilarForDelete(initialSelection);
         } catch (err) {
             console.error("Similar scan failed:", err);
             setError(`Similar scan failed: ${err}`);
         } finally {
             setIsScanning(false);
             setProgress(null);
+        }
+    };
+
+    const handleDeleteSimilarSelected = async () => {
+        const toDelete = Array.from(selectedSimilarForDelete);
+        if (toDelete.length === 0) return;
+
+        try {
+            const result = await invoke<string>("delete_to_trash", { files: toDelete });
+            console.log(result);
+            // Rescan after deletion
+            handleScanSimilar();
+            setSelectedSimilarForDelete(new Set());
+        } catch (err) {
+            console.error("Delete failed:", err);
+            setError(`Delete failed: ${err}`);
         }
     };
 
@@ -787,60 +832,99 @@ export function Clean() {
                                                 {group.files.length} similar images • {group.similarity.toFixed(0)}% match
                                             </div>
                                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                                {group.files.map((file, fileIdx) => (
-                                                    <div
-                                                        key={file.path}
-                                                        className="rounded-lg bg-white dark:bg-slate-900/50 overflow-hidden border border-border hover:border-teal-500/50 transition-colors"
-                                                    >
-                                                        <div className="aspect-square bg-neutral-200 dark:bg-slate-800 relative">
-                                                            <img
-                                                                src={convertFileSrc(file.path)}
-                                                                alt={file.path.split("/").pop() || ""}
-                                                                className="w-full h-full object-cover"
-                                                                loading="lazy"
-                                                                onError={(e) => {
-                                                                    // Hide broken image and show fallback
-                                                                    e.currentTarget.style.display = 'none';
-                                                                    const fallback = e.currentTarget.nextElementSibling;
-                                                                    if (fallback) (fallback as HTMLElement).style.display = 'flex';
-                                                                }}
-                                                            />
+                                                {(() => {
+                                                    const canonicalFile = getCanonicalFile(group.files);
+                                                    return group.files.map((file) => {
+                                                        const isCanonical = file.path === canonicalFile?.path;
+                                                        return (
                                                             <div
-                                                                className="absolute inset-0 items-center justify-center bg-neutral-200 dark:bg-slate-800 hidden"
+                                                                key={file.path}
+                                                                className={`rounded-lg overflow-hidden border transition-all ${
+                                                                    isCanonical
+                                                                        ? "bg-teal-500/5 border-teal-500/40"
+                                                                        : "bg-white dark:bg-slate-900/50 border-border"
+                                                                }`}
                                                             >
-                                                                <Eye className="w-8 h-8 text-neutral-400 dark:text-slate-600" />
+                                                                <div className="aspect-square bg-neutral-200 dark:bg-slate-800 relative">
+                                                                    <div className="absolute top-1.5 left-1.5 z-10 flex items-center justify-center bg-black/40 p-1 rounded backdrop-blur-xs">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={selectedSimilarForDelete.has(file.path)}
+                                                                            onChange={(e) => {
+                                                                                const newSet = new Set(selectedSimilarForDelete);
+                                                                                if (e.target.checked) {
+                                                                                    newSet.add(file.path);
+                                                                                } else {
+                                                                                    newSet.delete(file.path);
+                                                                                }
+                                                                                setSelectedSimilarForDelete(newSet);
+                                                                            }}
+                                                                            className="rounded border-neutral-400 dark:border-slate-600 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5 cursor-pointer"
+                                                                        />
+                                                                    </div>
+                                                                    <img
+                                                                        src={convertFileSrc(file.path)}
+                                                                        alt={file.path.split("/").pop() || ""}
+                                                                        className="w-full h-full object-cover"
+                                                                        loading="lazy"
+                                                                        onError={(e) => {
+                                                                            // Hide broken image and show fallback
+                                                                            e.currentTarget.style.display = 'none';
+                                                                            const fallback = e.currentTarget.nextElementSibling;
+                                                                            if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                                                                        }}
+                                                                    />
+                                                                    <div
+                                                                        className="absolute inset-0 items-center justify-center bg-neutral-200 dark:bg-slate-800 hidden"
+                                                                    >
+                                                                        <Eye className="w-8 h-8 text-neutral-400 dark:bg-slate-600" />
+                                                                    </div>
+                                                                    {isCanonical ? (
+                                                                        <div className="absolute top-1 right-1 text-[10px] bg-teal-600 text-white px-1.5 py-0.5 rounded font-medium z-10 shadow-sm">
+                                                                            Canonical
+                                                                        </div>
+                                                                    ) : (
+                                                                        file.similarity > 0 && (
+                                                                            <div className="absolute top-1 right-1 text-[10px] bg-neutral-900/80 text-white px-1.5 py-0.5 rounded z-10">
+                                                                                diff: {file.similarity}
+                                                                            </div>
+                                                                        )
+                                                                    )}
+                                                                </div>
+                                                                <div className="p-2">
+                                                                    <p className="text-xs truncate font-medium text-text-main" title={file.path}>
+                                                                        {file.path.split("/").pop()}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-text-muted">
+                                                                        {formatBytes(file.size)}
+                                                                        {file.width && file.height && ` • ${file.width}×${file.height}`}
+                                                                    </p>
+                                                                    {file.hash && (
+                                                                        <p className="text-[10px] text-text-muted font-mono truncate" title={file.hash}>
+                                                                            #{file.hash.substring(0, 8)}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                            {fileIdx === 0 && (
-                                                                <div className="absolute top-1 left-1 text-[10px] bg-teal-500/90 text-white px-1.5 py-0.5 rounded font-medium">
-                                                                    Reference
-                                                                </div>
-                                                            )}
-                                                            {file.similarity > 0 && (
-                                                                <div className="absolute top-1 right-1 text-[10px] bg-neutral-900/80 text-white px-1.5 py-0.5 rounded">
-                                                                    diff: {file.similarity}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="p-2">
-                                                            <p className="text-xs truncate font-medium text-text-main" title={file.path}>
-                                                                {file.path.split("/").pop()}
-                                                            </p>
-                                                            <p className="text-[10px] text-text-muted">
-                                                                {formatBytes(file.size)}
-                                                                {file.width && file.height && ` • ${file.width}×${file.height}`}
-                                                            </p>
-                                                            {file.hash && (
-                                                                <p className="text-[10px] text-text-muted font-mono truncate" title={file.hash}>
-                                                                    #{file.hash.substring(0, 8)}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                        );
+                                                    });
+                                                })()}
                                             </div>
                                         </div>
                                     ))}
                                 </div>
+
+                                {selectedSimilarForDelete.size > 0 && (
+                                    <div className="mt-4 flex justify-end">
+                                        <button
+                                            onClick={handleDeleteSimilarSelected}
+                                            className="btn-primary bg-red-600 hover:bg-red-700 border-red-600 hover:border-red-700 px-4 py-2 flex items-center gap-2"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            Delete {selectedSimilarForDelete.size} to Trash
+                                        </button>
+                                    </div>
+                                )}
                             </>
                         )}
 

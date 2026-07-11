@@ -267,11 +267,20 @@ impl Organizer {
 
     /// Calculate destination path for a file
     pub fn calculate_dest_path(&self, file_path: &Path, date: &str) -> PathBuf {
+        if date == "Unknown-Date" || date == "unknown" || date.is_empty() {
+            return self.dest_root.join("Unknown-Date").join(
+                file_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string(),
+            );
+        }
         // Date format: YYYY-MM-DD
         let parts: Vec<&str> = date.split('-').collect();
         if parts.len() != 3 {
-            // Invalid date, put in "unknown" folder
-            return self.dest_root.join("unknown").join(
+            // Invalid date, put in "Unknown-Date" folder
+            return self.dest_root.join("Unknown-Date").join(
                 file_path
                     .file_name()
                     .unwrap_or_default()
@@ -335,7 +344,7 @@ impl Organizer {
 
         let mut files = Vec::new();
         let mut will_organize = 0;
-        let mut will_skip = 0;
+        let will_skip = 0;
         let mut duplicates = 0;
         let mut already_imported = 0;
 
@@ -376,18 +385,14 @@ impl Organizer {
             // Get date
             let date = self.get_file_date(&file_path_str);
 
-            if date.is_none() {
-                files.push(FileOrganizeResult {
-                    source_path: file_path_str,
-                    dest_path: None,
-                    status: "skipped".to_string(),
-                    message: Some("No date found in EXIF or filename".to_string()),
-                });
-                will_skip += 1;
-                continue;
-            }
+            let (date_str, message) = match date {
+                Some(d) => (d, None),
+                None => (
+                    "Unknown-Date".to_string(),
+                    Some("No date found; importing to Unknown-Date".to_string()),
+                ),
+            };
 
-            let date_str = date.unwrap();
             let dest_file = self.calculate_dest_path(path, &date_str);
 
             // Check for duplicates within this preview pass
@@ -409,7 +414,7 @@ impl Organizer {
                 source_path: file_path_str,
                 dest_path: Some(dest_file.to_string_lossy().to_string()),
                 status: "will_organize".to_string(),
-                message: None,
+                message,
             });
             will_organize += 1;
         }
@@ -448,7 +453,7 @@ impl Organizer {
             .count();
 
         let mut organized = 0;
-        let mut skipped = 0;
+        let skipped = 0;
         let mut duplicates = 0;
         let mut errors = 0;
         let mut current = 0;
@@ -494,10 +499,7 @@ impl Organizer {
             // Get date
             let date = match self.get_file_date(&file_path_str) {
                 Some(d) => d,
-                None => {
-                    skipped += 1;
-                    continue;
-                }
+                None => "Unknown-Date".to_string(),
             };
 
             // Check for duplicates via hash
@@ -671,7 +673,7 @@ impl Organizer {
         let backup_status = if options.backup_path.is_some() { "pending" } else { "skipped" };
 
         let mut organized = 0;
-        let mut skipped = 0;
+        let skipped = 0;
         let mut duplicates = 0;
         let mut errors = 0;
         let mut current = 0;
@@ -735,10 +737,7 @@ impl Organizer {
             // Get date
             let date = match self.get_file_date(&file_path_str) {
                 Some(d) => d,
-                None => {
-                    skipped += 1;
-                    continue;
-                }
+                None => "Unknown-Date".to_string(),
             };
 
             // Check duplicates from this run / from the destination archive.
@@ -1165,16 +1164,16 @@ mod tests {
         assert_eq!(dest, PathBuf::from("/archive/2024/2024-01-15/photo.jpg"));
 
         let dest_invalid = organizer.calculate_dest_path(path, "invalid-date");
-        assert_eq!(dest_invalid, PathBuf::from("/archive/unknown/photo.jpg"));
+        assert_eq!(dest_invalid, PathBuf::from("/archive/Unknown-Date/photo.jpg"));
 
         let dest_empty = organizer.calculate_dest_path(path, "");
-        assert_eq!(dest_empty, PathBuf::from("/archive/unknown/photo.jpg"));
+        assert_eq!(dest_empty, PathBuf::from("/archive/Unknown-Date/photo.jpg"));
 
         let dest_partial = organizer.calculate_dest_path(path, "2024-01");
-        assert_eq!(dest_partial, PathBuf::from("/archive/unknown/photo.jpg"));
+        assert_eq!(dest_partial, PathBuf::from("/archive/Unknown-Date/photo.jpg"));
 
         let dest_wrong = organizer.calculate_dest_path(path, "2024/01/15");
-        assert_eq!(dest_wrong, PathBuf::from("/archive/unknown/photo.jpg"));
+        assert_eq!(dest_wrong, PathBuf::from("/archive/Unknown-Date/photo.jpg"));
     }
 
     #[test]

@@ -355,4 +355,56 @@ describe('Clean Page', () => {
             expect(screen.getByText('Found 1 groups of similar images')).toBeInTheDocument();
         });
     });
+
+    it('allows deleting selected similar images and automatically selects non-canonical files', async () => {
+        const mockSimilarResults = {
+            total_groups: 1,
+            similar_groups: [
+                {
+                    similarity: 95.5,
+                    files: [
+                        { path: '/test/img1.jpg', size: 2000, width: 1920, height: 1080, similarity: 0 },
+                        { path: '/test/img1_small.jpg', size: 500, width: 640, height: 480, similarity: 5 }
+                    ]
+                }
+            ]
+        };
+
+        const invoke = tauriCore.invoke as Mock;
+        invoke.mockImplementation((cmd) => {
+            if (cmd === 'check_czkawka') return Promise.resolve('found');
+            if (cmd === 'find_similar_images') return Promise.resolve(mockSimilarResults);
+            if (cmd === 'delete_to_trash') return Promise.resolve('Deleted 1 files');
+            return Promise.resolve();
+        });
+
+        mockOpen.mockResolvedValue('/test/path');
+        render(<Clean />);
+
+        // Switch to similar
+        fireEvent.click(screen.getByText(/Similar Images/i));
+        fireEvent.click(screen.getByText('Change'));
+        await waitFor(() => expect(screen.getByText('/test/path')).toBeInTheDocument());
+
+        const scanButtons = screen.getAllByText(/Find Similar/i);
+        fireEvent.click(scanButtons[0]);
+
+        // Expect similar results to render, with the canonical badge on the larger image
+        await waitFor(() => {
+            expect(screen.getByText('Found 1 groups of similar images')).toBeInTheDocument();
+            expect(screen.getByText('Canonical')).toBeInTheDocument();
+        });
+
+        // The small file should be checked (non-canonical auto-selected). So the delete button should say "Delete 1 to Trash"
+        const deleteBtn = screen.getByRole('button', { name: /Delete 1 to Trash/i });
+        expect(deleteBtn).toBeInTheDocument();
+        
+        fireEvent.click(deleteBtn);
+
+        await waitFor(() => {
+            expect(invoke).toHaveBeenCalledWith('delete_to_trash', {
+                files: ['/test/img1_small.jpg']
+            });
+        });
+    });
 });
