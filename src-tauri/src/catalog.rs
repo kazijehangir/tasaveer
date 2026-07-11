@@ -347,6 +347,22 @@ impl Catalog {
         })
     }
 
+    /// Mark any sessions still recorded as 'running' as 'interrupted'.
+    ///
+    /// Must only be called at app startup, before any operation can start:
+    /// a session is only legitimately 'running' while its ingest command is
+    /// executing, so at startup any such row is a leftover from a crash or
+    /// force-quit. Calling this mid-session would clobber a live operation.
+    pub fn mark_interrupted_sessions(&self) -> Result<usize, String> {
+        let finished_at = chrono::Local::now().to_rfc3339();
+        self.conn
+            .execute(
+                "UPDATE import_sessions SET status = 'interrupted', finished_at = ?1 WHERE status = 'running'",
+                params![finished_at],
+            )
+            .map_err(|e| format!("Failed to mark interrupted sessions: {}", e))
+    }
+
     pub fn recent_sessions(&self, limit: usize) -> Result<Vec<ImportSession>, String> {
         let mut stmt = self
             .conn
@@ -653,6 +669,44 @@ mod tests {
         assert_eq!(sessions.len(), 2);
         assert_eq!(sessions[0].id, "session-2"); // most recent first
         assert_eq!(sessions[1].id, "session-1");
+    }
+
+    #[test]
+    fn test_mark_interrupted_sessions() {
+        let (_dir, catalog) = open_test_catalog();
+        catalog
+            .create_session(&NewSession {
+                id: "crashed".to_string(),
+                started_at: "2024-01-15T10:00:00Z".to_string(),
+                source_path: "/src".to_string(),
+                source_label: None,
+                dest_path: "/archive".to_string(),
+                backup_path: None,
+            })
+            .unwrap();
+        catalog
+            .create_session(&NewSession {
+                id: "finished".to_string(),
+                started_at: "2024-01-14T10:00:00Z".to_string(),
+                source_path: "/src".to_string(),
+                source_label: None,
+                dest_path: "/archive".to_string(),
+                backup_path: None,
+            })
+            .unwrap();
+        catalog
+            .finish_session("finished", &SessionCounts::default(), "complete")
+            .unwrap();
+
+        let updated = catalog.mark_interrupted_sessions().unwrap();
+        assert_eq!(updated, 1);
+
+        let sessions = catalog.recent_sessions(10).unwrap();
+        let crashed = sessions.iter().find(|s| s.id == "crashed").unwrap();
+        assert_eq!(crashed.status, "interrupted");
+        assert!(crashed.finished_at.is_some());
+        let finished = sessions.iter().find(|s| s.id == "finished").unwrap();
+        assert_eq!(finished.status, "complete");
     }
 
     #[test]

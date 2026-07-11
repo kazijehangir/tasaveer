@@ -261,6 +261,16 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(AppState::new()) // Initialize AppState
+        .setup(|app| {
+            // Sessions can only legitimately be 'running' while their command
+            // executes, so at startup any such row is a crash leftover.
+            if let Ok(catalog) = catalog::Catalog::open(app.handle()) {
+                if let Err(e) = catalog.mark_interrupted_sessions() {
+                    eprintln!("Failed to clean up interrupted sessions: {}", e);
+                }
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())

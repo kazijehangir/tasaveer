@@ -1,9 +1,17 @@
 import { Upload, FolderOpen, HardDrive, Copy, Move, CheckCircle2, Image, Cloud, Archive, Camera, FolderTree, Tag, Plus, Search, X } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { load } from "@tauri-apps/plugin-store";
+import {
+  useIngestStore,
+  ensureIngestListeners,
+  isProcessingStatus,
+  type CameraModelGroup,
+  type DirectoryGroup,
+  type OrganizePreview,
+  type OrganizeResult,
+} from "../store/ingestStore";
 
 // Types for source tagging
 interface SourceTag {
@@ -14,54 +22,11 @@ interface SourceTag {
   directoryPatterns: string[];
 }
 
-interface CameraModelGroup {
-  model: string;
-  count: number;
-  assignedTag: string | null;
-}
-
-interface DirectoryGroup {
-  directory: string;
-  count: number;
-  assignedTag: string | null;
-}
-
 interface FileMetadataInfo {
   file_path: string;
   has_date: boolean;
   extracted_date: { date: string; time: string | null; source: string } | null;
   camera_model: string | null;
-}
-
-interface OrganizeResult {
-  total_files: number;
-  organized: number;
-  skipped: number;
-  duplicates: number;
-  errors: number;
-}
-
-interface FileOrganizeResult {
-  source_path: string;
-  dest_path: string | null;
-  status: string;
-  message: string | null;
-}
-
-interface OrganizePreview {
-  files: FileOrganizeResult[];
-  total_files: number;
-  will_organize: number;
-  will_skip: number;
-  duplicates: number;
-  already_imported: number;
-}
-
-interface TagProgress {
-  id: string;
-  current: number;
-  total: number;
-  message: string;
 }
 
 // Predefined colors for tags
@@ -85,84 +50,52 @@ const TAG_COLORS = [
   "bg-rose-500",
 ];
 
-type IngestType = 'local' | 'google-photos' | 'icloud';
-
 export function Ingest() {
-  const [ingestType, setIngestType] = useState<IngestType>('local');
-  const [selectedStrategy, setSelectedStrategy] = useState<'copy' | 'move'>('copy');
-  const [sourcePath, setSourcePath] = useState<string | null>(null);
-  const [destPath, setDestPath] = useState<string | null>(null);
+  // Operation and session state lives in the shared ingest store so a running
+  // operation stays visible when the user navigates away and back. Only
+  // page-local concerns (tag editing, log panel expansion) stay in useState.
+  const {
+    ingestType,
+    sourcePath,
+    destPath,
+    selectedStrategy,
+    enableTagging,
+    status,
+    logs,
+    progress,
+    previewData,
+    isScanned,
+    cameraModels,
+    directoryGroups,
+    setIngestType,
+    setSourcePath,
+    setDestPath,
+    setSelectedStrategy,
+    setEnableTagging,
+    setStatus,
+    setPreviewData,
+    setIsScanned,
+    setCameraModels,
+    setDirectoryGroups,
+    addLog,
+    clearLogs,
+    beginOperation,
+    endOperation,
+    requestCancel,
+  } = useIngestStore();
 
-
-  const [status, setStatus] = useState<'idle' | 'scanning' | 'previewing' | 'copying' | 'tagging' | 'organizing' | 'success' | 'error'>('idle');
-  const [logs, setLogs] = useState<string[]>([]);
   const [isLogsExpanded, setIsLogsExpanded] = useState(false);
-  const cancelledRef = useRef(false);
 
   // Tagging State
   const [sourceTags, setSourceTags] = useState<SourceTag[]>([]);
   const [newTagName, setNewTagName] = useState("");
-  const [enableTagging, setEnableTagging] = useState(true);
-
-  const [cameraModels, setCameraModels] = useState<CameraModelGroup[]>([]);
-  const [directoryGroups, setDirectoryGroups] = useState<DirectoryGroup[]>([]);
-
-  const [isScanned, setIsScanned] = useState(false);
-  const [previewData, setPreviewData] = useState<OrganizePreview | null>(null);
-
-  // Log buffering
-  const logBufferRef = useRef<string[]>([]);
-  const flushIntervalRef = useRef<number | null>(null);
 
   // Helper to check if any operation is in progress
-  const isProcessing = ['scanning', 'previewing', 'copying', 'tagging', 'organizing'].includes(status);
-
-  useEffect(() => {
-    const unlisten = listen<TagProgress>('tag-progress', (event) => {
-      if (event.payload.id === 'tag_staged_files') {
-        const { current, total, message } = event.payload;
-        addToLogs(`[Tagging ${current}/${total}] ${message}`);
-      }
-    });
-    return () => { unlisten.then(f => f()); };
-  }, []);
-
-  // Flush logs periodically to avoid React render thrashing
-  useEffect(() => {
-    if (isProcessing) {
-      flushIntervalRef.current = window.setInterval(() => {
-        if (logBufferRef.current.length > 0) {
-          const newLogs = [...logBufferRef.current];
-          logBufferRef.current = [];
-          setLogs(prev => [...prev, ...newLogs]);
-        }
-      }, 100);
-    } else {
-      // Flush remaining
-      if (logBufferRef.current.length > 0) {
-        const remaining = [...logBufferRef.current];
-        logBufferRef.current = [];
-        setLogs(prev => [...prev, ...remaining]);
-      }
-      if (flushIntervalRef.current) {
-        clearInterval(flushIntervalRef.current);
-        flushIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);
-    };
-  }, [status]);
+  const isProcessing = isProcessingStatus(status);
 
   const addToLogs = (msg: string) => {
     console.log('[Ingest]', msg);
-    logBufferRef.current.push(msg);
-    // If not running (e.g. error state), flush immediately to ensure visibility
-    if (!isProcessing) {
-      setLogs(prev => [...prev, msg]);
-      logBufferRef.current = []; // Clear buffer since we just flushed
-    }
+    addLog(msg);
   };
 
   // Handlers for file selection
@@ -200,34 +133,42 @@ export function Ingest() {
   };
 
   const handleCancel = async () => {
-    logBufferRef.current.push('Canceling operations...');
-    setLogs(prev => [...prev, 'Canceling operations...']); // Immediate feedback
-    cancelledRef.current = true;
+    addToLogs('Canceling operations...');
+    requestCancel();
 
-    // Cancel via Rust state management
+    // Cancel via Rust state management, using the id of whatever operation is
+    // currently running (each run gets a unique id).
+    const operationId = useIngestStore.getState().operationId;
     try {
-      await invoke('cancel_operation', { operationId: 'organize_ingest' });
-      logBufferRef.current.push('Cancel signal sent.');
+      if (operationId) {
+        await invoke('cancel_operation', { operationId });
+        addToLogs('Cancel signal sent.');
+      }
     } catch (err) {
       console.error('Failed to cancel:', err);
     }
 
-    logBufferRef.current.push('Operation canceled by user.');
-    setStatus('idle');
+    addToLogs('Operation canceled by user.');
+    endOperation('idle');
   };
 
-  // Load settings and tags
+  // Register app-lifetime progress listeners (idempotent), then load settings
+  // and tags. Path defaults must not clobber values the user already picked
+  // (or an operation currently running against them), so they only apply when
+  // the store has no value yet.
   useEffect(() => {
+    ensureIngestListeners();
+
     async function loadData() {
       try {
         const store = await load('settings.json');
         const archivePathValue = await store.get<string>('archivePath');
-        if (archivePathValue) {
+        if (archivePathValue && !useIngestStore.getState().destPath) {
           setDestPath(archivePathValue);
         }
-        
+
         const defaultSourcePath = await store.get<string>('defaultSourcePath');
-        if (defaultSourcePath) {
+        if (defaultSourcePath && !useIngestStore.getState().sourcePath) {
           setSourcePath(defaultSourcePath);
         }
 
@@ -240,6 +181,7 @@ export function Ingest() {
       }
     }
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const saveTags = async (tags: SourceTag[]) => {
@@ -275,7 +217,7 @@ export function Ingest() {
 
   const scanSource = async () => {
     if (!sourcePath) return;
-    setStatus('scanning');
+    beginOperation('scanning', 'scan_source');
     setCameraModels([]);
     setDirectoryGroups([]);
 
@@ -394,9 +336,9 @@ export function Ingest() {
     setSourceTags(updatedTags);
     saveTags(updatedTags);
 
-    // Update local state
-    setCameraModels((prev) =>
-      prev.map((cm) =>
+    // Update shared scan-result state
+    setCameraModels(
+      cameraModels.map((cm) =>
         cm.model === model
           ? { ...cm, assignedTag: tagId ? updatedTags.find((t) => t.id === tagId)?.name || null : null }
           : cm
@@ -420,8 +362,8 @@ export function Ingest() {
     setSourceTags(updatedTags);
     saveTags(updatedTags);
 
-    setDirectoryGroups((prev) =>
-      prev.map((dg) =>
+    setDirectoryGroups(
+      directoryGroups.map((dg) =>
         dg.directory === directory
           ? { ...dg, assignedTag: tagId ? updatedTags.find((t) => t.id === tagId)?.name || null : null }
           : dg
@@ -432,20 +374,20 @@ export function Ingest() {
   const handleIngest = async () => {
     if (!sourcePath || !destPath) return;
 
-    setStatus('scanning'); // Initial state, will change
-    setLogs([]);
-    logBufferRef.current = [];
+    // Unique id per run so cancellation targets the right operation even if
+    // the page was remounted (or an older run is still finishing up).
+    const operationId = `ingest_${Date.now()}`;
+
+    clearLogs();
+    beginOperation('scanning', operationId); // Initial state, will change
     setIsLogsExpanded(true);
-    cancelledRef.current = false;
 
     addToLogs('Initializing ingest process...');
 
     // Validate paths
     if (navigator.platform.toLowerCase().includes('win') && destPath.startsWith('/')) {
-      const errorMsg = `Invalid destination path format: ${destPath}`;
-      addToLogs(errorMsg);
-      setStatus('error');
-      setLogs(prev => [...prev, errorMsg]);
+      addToLogs(`Invalid destination path format: ${destPath}`);
+      endOperation('error');
       return;
     }
 
@@ -470,7 +412,7 @@ export function Ingest() {
           rules,
           moveFiles: selectedStrategy === 'move',
           enableTagging,
-          operationId: 'organize_ingest',
+          operationId,
         });
 
         addToLogs(`Ingest complete:`);
@@ -486,16 +428,16 @@ export function Ingest() {
         addToLogs("Non-local ingest not fully unified yet.");
       }
 
-      if (!cancelledRef.current) {
-        setStatus('success');
+      if (!useIngestStore.getState().cancelRequested) {
+        endOperation('success');
         addToLogs(`All operations completed!`);
       }
 
     } catch (err) {
       console.error('Ingest failed:', err);
-      if (!cancelledRef.current) {
-        setStatus('error');
-        setLogs(prev => [...prev, `Failed to execute ingest: ${err}`]);
+      if (!useIngestStore.getState().cancelRequested) {
+        endOperation('error');
+        addToLogs(`Failed to execute ingest: ${err}`);
       }
     }
   };
@@ -880,6 +822,23 @@ export function Ingest() {
               </div>
             </div>
 
+            {/* Live Progress (from organize-progress events) */}
+            {isProcessing && progress && (
+              <div className="mb-4" data-testid="ingest-progress">
+                <div className="flex justify-between items-baseline text-xs text-text-muted mb-1">
+                  <span className="truncate max-w-[70%]" title={progress.currentFile}>{progress.currentFile}</span>
+                  <span>{progress.current} / {progress.total}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-surface-secondary overflow-hidden">
+                  <div
+                    className="h-full bg-primary-500 transition-all duration-300"
+                    style={{ width: progress.total > 0 ? `${Math.round((progress.current / progress.total) * 100)}%` : '0%' }}
+                  />
+                </div>
+                <p className="text-[10px] text-text-muted mt-1 capitalize">{progress.phase}</p>
+              </div>
+            )}
+
             {/* Cancel Button */}
             {isProcessing && (
               <button
@@ -898,7 +857,6 @@ export function Ingest() {
                 ) : (
                   logs.map((log, i) => (
                     <div key={i} className="mb-1 border-b border-white/5 pb-0.5 last:border-0">
-                      <span className="opacity-50 mr-2">[{new Date().toLocaleTimeString()}]</span>
                       {log}
                     </div>
                   ))

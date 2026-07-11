@@ -1,5 +1,6 @@
 import React from 'react';
 import { Home, Layers, HardDrive, Settings, Upload } from 'lucide-react';
+import { useIngestStore, isProcessingStatus } from '../../store/ingestStore';
 
 interface SidebarProps {
     activeTab: string;
@@ -7,6 +8,10 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+    // Shows that an ingest operation is still running even when the user is
+    // on a different tab (the operation itself lives in the Rust backend).
+    const ingestRunning = useIngestStore((s) => isProcessingStatus(s.status));
+
     const menuItems = [
         { id: 'dashboard', label: 'Home', icon: Home },
         { id: 'ingest', label: 'Ingest', icon: HardDrive },
@@ -47,6 +52,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                                         {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-500 rounded-r-full" />}
                                         <Icon size={18} className={isActive ? 'text-primary-500' : 'text-text-muted group-hover:text-text-main'} />
                                         {item.label}
+                                        {item.id === 'ingest' && ingestRunning && (
+                                            <span
+                                                data-testid="ingest-running-indicator"
+                                                title="An ingest operation is running"
+                                                className="ml-auto w-2 h-2 rounded-full bg-primary-500 animate-pulse"
+                                            />
+                                        )}
                                     </button>
                                 );
                             })}
