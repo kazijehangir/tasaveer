@@ -90,6 +90,12 @@ Fully implemented local staging, cloud backup, and SD card reconciliation pipeli
 - **Tauri Commands**: Registers `run_reconcile`, `backup_at_risk` (copies to Drive and updates catalog), `free_local_space` (re-verifies, moves to Trash, updates catalog), `deep_verify_folder` (downloads Drive files to match full hashes), and `seed_catalog_from_reconcile`.
 - **UI page & Zustand Store (`src/pages/Reconcile.tsx`, `src/store/reconcileStore.ts`)**: Built page view with metrics, warning banner, expandable folder breakdowns, interactive modals, and persistent progress listeners. Added route to `App.tsx` and sidebar link with `Scale` icon.
 
+### Release 1.0.0 Preparation (shipped)
+- Renamed project package name from default template `tauri-app` to `tasaveer` in `package.json` and `src-tauri/Cargo.toml`.
+- Renamed library crate from `tauri_app_lib` to `tasaveer_lib` in `src-tauri/Cargo.toml` and updated reference in `src-tauri/src/main.rs`.
+- Bumped app version from `0.1.0` to `1.0.0` across `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
+- Updated all lockfiles (`package-lock.json` and `src-tauri/Cargo.lock`) and verified all tests pass (101 Rust + 63 frontend).
+
 ---
 
 ## 3. NEXT UP: Google Drive Backup Sync (PR3)

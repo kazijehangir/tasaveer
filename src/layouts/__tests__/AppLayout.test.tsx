@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from '../AppLayout';
 
@@ -35,7 +35,52 @@ describe('AppLayout', () => {
             renderWithRouter();
 
             expect(screen.getByText('Settings')).toBeInTheDocument();
+        });
 
+        it('syncs active tab with pathname on load', () => {
+            const { unmount } = renderWithRouter('/ingest');
+            expect(screen.getByText('Ingest')).toHaveClass('bg-primary-100');
+            unmount();
+
+            const { unmount: unmountClean } = renderWithRouter('/clean');
+            expect(screen.getByText('Clean & Dedup')).toHaveClass('bg-primary-100');
+            unmountClean();
+
+            const { unmount: unmountReconcile } = renderWithRouter('/reconcile');
+            expect(screen.getByText('Free Space')).toHaveClass('bg-primary-100');
+            unmountReconcile();
+
+            const { unmount: unmountSync } = renderWithRouter('/sync');
+            expect(screen.getByText('Export')).toHaveClass('bg-primary-100');
+            unmountSync();
+
+            const { unmount: unmountSettings } = renderWithRouter('/settings');
+            expect(screen.getByText('Settings')).toHaveClass('bg-primary-100');
+            unmountSettings();
+        });
+
+        it('navigates when clicking tabs', () => {
+            renderWithRouter();
+
+            // Click Ingest
+            fireEvent.click(screen.getByText('Ingest'));
+            expect(screen.getByText('Ingest')).toHaveClass('bg-primary-100');
+
+            // Click Clean & Dedup
+            fireEvent.click(screen.getByText('Clean & Dedup'));
+            expect(screen.getByText('Clean & Dedup')).toHaveClass('bg-primary-100');
+
+            // Click Free Space
+            fireEvent.click(screen.getByText('Free Space'));
+            expect(screen.getByText('Free Space')).toHaveClass('bg-primary-100');
+
+            // Click Settings
+            fireEvent.click(screen.getByText('Settings'));
+            expect(screen.getByText('Settings')).toHaveClass('bg-primary-100');
+
+            // Click Home
+            fireEvent.click(screen.getByText('Home'));
+            expect(screen.getByText('Home')).toHaveClass('bg-primary-100');
         });
     });
 

@@ -59,6 +59,7 @@ describe('Settings', () => {
                 const data: Record<string, string> = {
                     archivePath: '/test/archive',
                     defaultSourcePath: '/test/source',
+                    backupPath: '/test/backup',
                     immichUrl: 'http://localhost:2283',
                     immichApiKey: 'test-api-key',
                     exiftoolPath: '',
@@ -144,6 +145,77 @@ describe('Settings', () => {
                 expect(mockOpen).toHaveBeenCalledWith(expect.objectContaining({
                     title: 'Select Archive Folder'
                 }));
+            });
+        });
+
+        it('allows browsing for Google Drive backup path', async () => {
+            const user = userEvent.setup();
+            mockOpen.mockResolvedValueOnce('/new/backup/path');
+            renderSettings();
+
+            await waitFor(() => expect(screen.getByDisplayValue('/test/backup')).toBeInTheDocument());
+
+            const buttons = screen.getAllByText('Browse');
+            await user.click(buttons[2]); // Google Drive Backup is third
+
+            await waitFor(() => {
+                expect(screen.getByDisplayValue('/new/backup/path')).toBeInTheDocument();
+                expect(mockOpen).toHaveBeenCalledWith(expect.objectContaining({
+                    title: 'Select Google Drive Backup Folder'
+                }));
+            });
+        });
+
+        it('allows configuring and testing Immich Server connection', async () => {
+            const user = userEvent.setup();
+            renderSettings();
+
+            await waitFor(() => expect(screen.getByDisplayValue('http://localhost:2283')).toBeInTheDocument());
+
+            // Test connection with default settings
+            const testBtn = screen.getByText('Test Connection');
+            await user.click(testBtn);
+
+            await waitFor(() => {
+                expect(screen.getByText('Connected successfully!')).toBeInTheDocument();
+            });
+
+            // Simulate testing failure
+            mockInvoke.mockRejectedValueOnce('Network error');
+            await user.click(testBtn);
+
+            await waitFor(() => {
+                expect(screen.getByText(/Network error/)).toBeInTheDocument();
+            });
+        });
+
+        it('allows overriding exiftool binary path and clearing it', async () => {
+            const user = userEvent.setup();
+            mockOpen.mockResolvedValueOnce('/custom/exiftool');
+            renderSettings();
+
+            await waitFor(() => {
+                expect(screen.getByLabelText('ExifTool Binary Path')).toBeInTheDocument();
+            });
+
+            const input = screen.getByLabelText('ExifTool Binary Path') as HTMLInputElement;
+            expect(input.value).toBe('');
+
+            const buttons = screen.getAllByText('Browse');
+            // Exiftool is in Advanced Custom Binary Paths.
+            // Let's find Browse buttons and choose the correct one (index 3).
+            await user.click(buttons[3]);
+
+            await waitFor(() => {
+                expect(input.value).toBe('/custom/exiftool');
+            });
+
+            // Clear button should be visible now
+            const clearBtn = screen.getByTitle('Clear custom path');
+            await user.click(clearBtn);
+
+            await waitFor(() => {
+                expect(input.value).toBe('');
             });
         });
     });

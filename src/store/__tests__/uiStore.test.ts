@@ -69,4 +69,35 @@ describe('uiStore', () => {
 
         expect(useUIStore.getState().theme).toBe('dark');
     });
+
+    it('handles theme saving errors gracefully', async () => {
+        (load as any).mockRejectedValue(new Error('Failed to load store'));
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await useUIStore.getState().setTheme('dark');
+
+        expect(useUIStore.getState().theme).toBe('dark');
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        consoleErrorSpy.mockRestore();
+    });
+
+    it('handles theme initialization errors and falls back to system preference', async () => {
+        (load as any).mockRejectedValue(new Error('Failed to load store'));
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        // Mock matchMedia for dark mode fallback
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: vi.fn().mockImplementation(query => ({
+                matches: query === '(prefers-color-scheme: dark)',
+                media: query,
+            })),
+        });
+
+        await useUIStore.getState().initTheme();
+
+        expect(useUIStore.getState().theme).toBe('dark');
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        consoleErrorSpy.mockRestore();
+    });
 });
