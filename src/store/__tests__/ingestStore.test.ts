@@ -166,7 +166,7 @@ describe('ingestStore', () => {
                 status: 'copying',
             },
         });
-        expect(useIngestStore.getState().progress.currentFile).toBe('pic.jpg');
+        expect(useIngestStore.getState().progress?.currentFile).toBe('pic.jpg');
 
         // 3. Send tag progress event for tag_staged_files operation
         tagListener({

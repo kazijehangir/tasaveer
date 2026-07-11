@@ -155,7 +155,7 @@ describe('reconcileStore', () => {
         });
 
         const state2 = useReconcileStore.getState();
-        expect(state2.progress.phase).toBe('deleting');
+        expect(state2.progress?.phase).toBe('deleting');
         expect(state2.logs[1]).toContain('Trashing [2/10]: old.jpg');
 
         // Send progress event for active operation (deep_verifying phase)
