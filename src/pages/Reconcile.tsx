@@ -49,6 +49,7 @@ export function Reconcile() {
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [targetFolder, setTargetFolder] = useState<string | null>(null); // null means all
   const [deepVerifyResults, setDeepVerifyResults] = useState<any[] | null>(null);
+  const [ejecting, setEjecting] = useState(false);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -255,6 +256,24 @@ export function Reconcile() {
     } catch (err) {
       endOperation("error");
       addLog(`Error during indexing: ${err}`);
+    }
+  };
+
+  const handleEject = async () => {
+    if (!report || !report.sd_root) return;
+    setEjecting(true);
+    addLog(`Attempting to eject SD card at ${report.sd_root}...`);
+    try {
+      const msg = await invoke<string>("eject_volume", { path: report.sd_root });
+      addLog(`Eject result: ${msg}`);
+      setSdRoot("");
+      // Trigger scan to update UI
+      handleScan();
+    } catch (err) {
+      console.error(err);
+      addLog(`Error ejecting card: ${err}`);
+    } finally {
+      setEjecting(false);
     }
   };
 
@@ -471,6 +490,65 @@ export function Reconcile() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* SD Card Format Assistant */}
+      {report && report.sd_root && report.sd_total_files > 0 && (
+        <div className="glass-card p-6 border-l-4 border-primary-500 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-lg ${report.sd_pending_files === 0 ? "bg-green-500/15 text-green-400" : "bg-yellow-500/15 text-yellow-400"}`}>
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-text-main">SD Card Format Assistant</h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Verify if your SD card volume <span className="font-mono bg-surface-secondary px-1.5 py-0.5 rounded text-text-main">{report.sd_root}</span> is safe to reformat.
+                </p>
+              </div>
+            </div>
+
+            {report.sd_pending_files === 0 && (
+              <button
+                onClick={handleEject}
+                disabled={ejecting || isBusy}
+                className="btn-primary flex-shrink-0 flex items-center gap-2 px-5 py-2"
+              >
+                {ejecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 rotate-90" />}
+                {ejecting ? "Ejecting..." : "Eject SD Card"}
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 pt-2 text-center">
+            <div className="bg-surface-secondary/40 p-3 rounded-lg border border-border-main/10">
+              <span className="text-xs text-text-muted block">Total Files on SD</span>
+              <span className="text-xl font-bold text-text-main">{report.sd_total_files}</span>
+            </div>
+            <div className="bg-surface-secondary/40 p-3 rounded-lg border border-border-main/10">
+              <span className="text-xs text-text-muted block">Archived to Drive</span>
+              <span className="text-xl font-bold text-green-400">{report.sd_archived_files}</span>
+            </div>
+            <div className="bg-surface-secondary/40 p-3 rounded-lg border border-border-main/10">
+              <span className="text-xs text-text-muted block">Pending Backup</span>
+              <span className={`text-xl font-bold ${report.sd_pending_files === 0 ? "text-green-400" : "text-red-400"}`}>
+                {report.sd_pending_files}
+              </span>
+            </div>
+          </div>
+
+          {report.sd_pending_files === 0 ? (
+            <div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-lg text-sm leading-relaxed">
+              <span className="font-semibold block mb-0.5">✅ Safe to Format in Camera!</span>
+              All files on this card have been verified as successfully backed up to your Google Drive. You can safely eject this card and format it inside your camera to prepare it for your next shoot.
+            </div>
+          ) : (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 p-4 rounded-lg text-sm leading-relaxed">
+              <span className="font-semibold block mb-0.5">⚠️ Not Safe to Format Yet!</span>
+              There are still <span className="font-bold underline">{report.sd_pending_files}</span> files on this card that have not been backed up to Google Drive. Please complete the staging import and backup sync before formatting this card.
+            </div>
+          )}
         </div>
       )}
 

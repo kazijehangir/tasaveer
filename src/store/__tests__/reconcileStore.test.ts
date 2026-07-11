@@ -94,6 +94,9 @@ describe('reconcileStore', () => {
             drive_root: '/drive',
             sd_root: '/sd',
             warnings: [],
+            sd_total_files: 0,
+            sd_archived_files: 0,
+            sd_pending_files: 0,
         };
 
         useReconcileStore.getState().setReport(mockReport);

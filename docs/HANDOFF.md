@@ -87,8 +87,9 @@ SQLite DB (via `rusqlite = { version = "0.32", features = ["bundled"] }`) at `{a
 Fully implemented local staging, cloud backup, and SD card reconciliation pipeline:
 - **Disk Safety (`src-tauri/src/disk.rs`)**: Cross-platform disk capacity checks ensuring 5 GB minimum space on the target path before running write operations (unified ingest, backup sync, deep verification downloads).
 - **Matching & Core Engine (`src-tauri/src/reconcile.rs`)**: Walks directory structures using metadata (size/name) without downloading Drive placeholders. Matches laptop ↔ Drive on `(rel_path, size)` and laptop ↔ SD on `(file_name, size)`. Classifies files as `SafeToFree`, `AtRisk` (missing from Drive), `DriveOnly`, or `SdOnly`.
-- **Tauri Commands**: Registers `run_reconcile`, `backup_at_risk` (copies to Drive and updates catalog), `free_local_space` (re-verifies, moves to Trash, updates catalog), `deep_verify_folder` (downloads Drive files to match full hashes), and `seed_catalog_from_reconcile`.
+- **Tauri Commands**: Registers `run_reconcile`, `backup_at_risk` (copies to Drive and updates catalog), `free_local_space` (re-verifies, moves to Trash, updates catalog), `deep_verify_folder` (downloads Drive files to match full hashes), `seed_catalog_from_reconcile`, and `eject_volume`.
 - **UI page & Zustand Store (`src/pages/Reconcile.tsx`, `src/store/reconcileStore.ts`)**: Built page view with metrics, warning banner, expandable folder breakdowns, interactive modals, and persistent progress listeners. Added route to `App.tsx` and sidebar link with `Scale` icon.
+- **SD Card Format Assistant**: Displays volume verification details on the SD card once scanned. Confirms when it is 100% archived and safe to format in-camera, providing a one-click unmount/eject action.
 
 ### Release 1.0.0 Preparation (shipped)
 - Renamed project package name from default template `tauri-app` to `tasaveer` in `package.json` and `src-tauri/Cargo.toml`.

@@ -41,6 +41,9 @@ export interface ReconcileReport {
     drive_root: string | null;
     sd_root: string | null;
     warnings: string[];
+    sd_total_files: number;
+    sd_archived_files: number;
+    sd_pending_files: number;
 }
 
 export interface ReconcileProgress {

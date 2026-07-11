@@ -93,6 +93,9 @@ describe("Reconcile Page", () => {
           drive_root: "/test/backup",
           sd_root: null,
           warnings: [],
+          sd_total_files: 0,
+          sd_archived_files: 0,
+          sd_pending_files: 0,
         });
       }
       return Promise.resolve();

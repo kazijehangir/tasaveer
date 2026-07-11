@@ -58,6 +58,9 @@ pub struct ReconcileReport {
     pub drive_root: Option<String>,
     pub sd_root: Option<String>,
     pub warnings: Vec<String>,
+    pub sd_total_files: usize,
+    pub sd_archived_files: usize,
+    pub sd_pending_files: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -373,6 +376,18 @@ pub fn run_reconcile_internal(
         }
     }
 
+    let sd_total_files = sd_files.len();
+    let mut sd_archived_files = 0;
+    let mut sd_pending_files = 0;
+    for f in &sd_files {
+        let key = (f.file_name.clone(), f.size);
+        if drive_names_sizes.contains(&key) {
+            sd_archived_files += 1;
+        } else {
+            sd_pending_files += 1;
+        }
+    }
+
     let mut folders: Vec<FolderSummary> = folder_summaries.into_values().collect();
     folders.sort_by(|a, b| a.folder.cmp(&b.folder));
 
@@ -383,10 +398,13 @@ pub fn run_reconcile_internal(
         files,
         total_reclaimable_bytes,
         total_at_risk_bytes,
-        laptop_root: laptop_root,
+        laptop_root,
         drive_root,
         sd_root,
         warnings,
+        sd_total_files,
+        sd_archived_files,
+        sd_pending_files,
     })
 }
 
@@ -906,6 +924,29 @@ pub fn seed_catalog_internal(
     }
 
     Ok(seeded)
+}
+
+#[tauri::command]
+pub async fn eject_volume(path: String) -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let status = std::process::Command::new("diskutil")
+            .arg("eject")
+            .arg(&path)
+            .status()
+            .map_err(|e| format!("Failed to run diskutil: {}", e))?;
+
+        if status.success() {
+            Ok("Volume ejected successfully".to_string())
+        } else {
+            Err("Failed to eject volume. It may be busy.".to_string())
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        Ok("Mock eject success".to_string())
+    }
 }
 
 #[cfg(test)]

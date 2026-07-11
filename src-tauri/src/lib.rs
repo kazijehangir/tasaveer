@@ -307,6 +307,7 @@ pub fn run() {
             reconcile::free_local_space,
             reconcile::deep_verify_folder,
             reconcile::seed_catalog_from_reconcile,
+            reconcile::eject_volume,
             // Catalog commands
             catalog::get_catalog_path,
             catalog::get_catalog_stats,
