@@ -36,22 +36,13 @@ The archive on disk is always the source of truth; the catalog is an auxiliary i
 ## Install & prerequisites
 
 ### Bundled dependencies
-**immich-go** and **ExifTool** ship with Tasaveer — no separate install needed.
-
-### Czkawka (required for deduplication)
-Install `czkawka_cli` for duplicate / similar-image scanning:
-
-```bash
-# macOS
-brew install czkawka
-```
-On Windows, download `czkawka_cli` from [qarmin/czkawka](https://github.com/qarmin/czkawka/releases) and add it to PATH, or set its location in **Settings → Advanced: Custom Binary Paths**.
+**immich-go**, **ExifTool**, and **czkawka_cli** all ship bundled directly with Tasaveer — no separate installation or system prerequisites are needed!
 
 | Tool | Bundled | Repository |
 | --- | --- | --- |
 | immich-go | ✅ | [simulot/immich-go](https://github.com/simulot/immich-go) |
 | ExifTool | ✅ | [exiftool.org](https://exiftool.org/) |
-| czkawka | ❌ | [qarmin/czkawka](https://github.com/qarmin/czkawka) |
+| czkawka | ✅ | [qarmin/czkawka](https://github.com/qarmin/czkawka) |
 
 ## Development
 
