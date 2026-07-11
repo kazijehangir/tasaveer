@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "download-deps": "node scripts/download-binaries.js",
+    "download-deps:macos": "node scripts/download-binaries.js --macos",
     "download-deps:all": "node scripts/download-binaries.js --all",
     "test": "vitest",
     "test:ui": "vitest --ui",

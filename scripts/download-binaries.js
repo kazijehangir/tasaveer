@@ -215,30 +215,40 @@ async function downloadImmichGo(targetTriples) {
             continue;
         }
 
-        const outputName = `immich-go-${config.targetTriple}${config.extension}`;
-        const outputPath = path.join(BINARIES_DIR, outputName);
+        try {
+            const outputName = `immich-go-${config.targetTriple}${config.extension}`;
+            const outputPath = path.join(BINARIES_DIR, outputName);
 
-        // Check if already exists
-        if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
-            console.log(`   ✓ ${outputName} already exists, skipping`);
-            continue;
+            // Check if already exists
+            if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+                console.log(`   ✓ ${outputName} already exists, skipping`);
+                continue;
+            }
+
+            const asset = releaseInfo.assets.find(a => a.name === assetName);
+            if (!asset) {
+                console.warn(`   ⚠ Asset not found: ${assetName}`);
+                continue;
+            }
+
+            console.log(`   ⬇ Downloading ${assetName}...`);
+
+            const archivePath = path.join(BINARIES_DIR, assetName);
+            await downloadFile(asset.browser_download_url, archivePath);
+
+            console.log(`   📂 Extracting to ${outputName}...`);
+            await extractBinary(archivePath, config.extract, 'immich-go', outputPath);
+
+            console.log(`   ✓ ${outputName} ready`);
+        } catch (err) {
+            console.error(`   ❌ Failed to download immich-go for ${config.targetTriple}:`, err.message);
+            // Only throw error if it is critical for the current platform/macos build
+            const currentTriple = getCurrentTargetTriple();
+            const isMacosBuild = process.argv.includes('--macos');
+            if (config.targetTriple === currentTriple || (isMacosBuild && config.targetTriple.includes('apple-darwin'))) {
+                throw err;
+            }
         }
-
-        const asset = releaseInfo.assets.find(a => a.name === assetName);
-        if (!asset) {
-            console.warn(`   ⚠ Asset not found: ${assetName}`);
-            continue;
-        }
-
-        console.log(`   ⬇ Downloading ${assetName}...`);
-
-        const archivePath = path.join(BINARIES_DIR, assetName);
-        await downloadFile(asset.browser_download_url, archivePath);
-
-        console.log(`   📂 Extracting to ${outputName}...`);
-        await extractBinary(archivePath, config.extract, 'immich-go', outputPath);
-
-        console.log(`   ✓ ${outputName} ready`);
     }
 }
 
@@ -269,96 +279,106 @@ async function downloadExifTool(targetTriples) {
             continue;
         }
 
-        const outputName = `exiftool-${config.targetTriple}${config.extension}`;
-        const outputPath = path.join(BINARIES_DIR, outputName);
-
-        // Check if already exists
-        if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
-            console.log(`   ✓ ${outputName} already exists, skipping`);
-            continue;
-        }
-
-        console.log(`   ⬇ Downloading ExifTool for ${targetTriple}...`);
-
-        const archiveExt = config.extract === 'zip' ? '.zip' : '.tar.gz';
-        const archivePath = path.join(BINARIES_DIR, `exiftool-${targetTriple}${archiveExt}`);
-
-        await downloadFile(config.url, archivePath);
-
-        console.log(`   📂 Extracting...`);
-
-        const tempDir = path.join(BINARIES_DIR, '_temp_exiftool');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
-
         try {
-            if (config.extract === 'zip') {
-                // Windows: extract and find the exe
-                if (process.platform === 'win32') {
-                    execSync(`powershell -command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`, { stdio: 'inherit' });
-                } else {
-                    execSync(`unzip -o "${archivePath}" -d "${tempDir}"`, { stdio: 'inherit' });
-                }
+            const outputName = `exiftool-${config.targetTriple}${config.extension}`;
+            const outputPath = path.join(BINARIES_DIR, outputName);
 
-                // Find exiftool(-k).exe and rename it
-                const files = fs.readdirSync(tempDir);
-                const exeFile = files.find(f => f.includes('exiftool') && f.endsWith('.exe'));
-                if (exeFile) {
-                    fs.copyFileSync(path.join(tempDir, exeFile), outputPath);
-                } else {
-                    throw new Error('ExifTool exe not found in archive');
-                }
-            } else {
-                // macOS/Linux: Perl distribution
-                execSync(`tar -xzf "${archivePath}" -C "${tempDir}"`, { stdio: 'inherit' });
+            // Check if already exists
+            if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+                console.log(`   ✓ ${outputName} already exists, skipping`);
+                continue;
+            }
 
-                // Find the extracted directory (Image-ExifTool-X.XX)
-                const files = fs.readdirSync(tempDir);
-                const exifToolDir = files.find(f => f.startsWith('Image-ExifTool'));
+            console.log(`   ⬇ Downloading ExifTool for ${targetTriple}...`);
 
-                if (!exifToolDir) {
-                    throw new Error('ExifTool directory not found in archive');
-                }
+            const archiveExt = config.extract === 'zip' ? '.zip' : '.tar.gz';
+            const archivePath = path.join(BINARIES_DIR, `exiftool-${targetTriple}${archiveExt}`);
 
-                const exifToolPath = path.join(tempDir, exifToolDir);
+            await downloadFile(config.url, archivePath);
 
-                if (config.perlBundle) {
-                    // Create a self-contained directory with the Perl scripts
-                    const bundleDir = path.join(BINARIES_DIR, `exiftool-bundle-${targetTriple}`);
-                    if (fs.existsSync(bundleDir)) {
-                        fs.rmSync(bundleDir, { recursive: true, force: true });
+            console.log(`   📂 Extracting...`);
+
+            const tempDir = path.join(BINARIES_DIR, '_temp_exiftool');
+            if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+            }
+
+            try {
+                if (config.extract === 'zip') {
+                    // Windows: extract and find the exe
+                    if (process.platform === 'win32') {
+                        execSync(`powershell -command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tempDir}' -Force"`, { stdio: 'inherit' });
+                    } else {
+                        execSync(`unzip -o "${archivePath}" -d "${tempDir}"`, { stdio: 'inherit' });
                     }
-                    fs.mkdirSync(bundleDir, { recursive: true });
 
-                    // Copy exiftool script and lib directory
-                    fs.copyFileSync(path.join(exifToolPath, 'exiftool'), path.join(bundleDir, 'exiftool'));
+                    // Find exiftool(-k).exe and rename it
+                    const files = fs.readdirSync(tempDir);
+                    const exeFile = files.find(f => f.includes('exiftool') && f.endsWith('.exe'));
+                    if (exeFile) {
+                        fs.copyFileSync(path.join(tempDir, exeFile), outputPath);
+                    } else {
+                        throw new Error('ExifTool exe not found in archive');
+                    }
+                } else {
+                    // macOS/Linux: Perl distribution
+                    execSync(`tar -xzf "${archivePath}" -C "${tempDir}"`, { stdio: 'inherit' });
 
-                    // Copy lib directory recursively
-                    const libSrc = path.join(exifToolPath, 'lib');
-                    const libDest = path.join(bundleDir, 'lib');
-                    execSync(`cp -r "${libSrc}" "${libDest}"`, { stdio: 'inherit' });
+                    // Find the extracted directory (Image-ExifTool-X.XX)
+                    const files = fs.readdirSync(tempDir);
+                    const exifToolDir = files.find(f => f.startsWith('Image-ExifTool'));
 
-                    // Create a wrapper script
-                    const wrapperContent = `#!/bin/sh
+                    if (!exifToolDir) {
+                        throw new Error('ExifTool directory not found in archive');
+                    }
+
+                    const exifToolPath = path.join(tempDir, exifToolDir);
+
+                    if (config.perlBundle) {
+                        // Create a self-contained directory with the Perl scripts
+                        const bundleDir = path.join(BINARIES_DIR, `exiftool-bundle-${targetTriple}`);
+                        if (fs.existsSync(bundleDir)) {
+                            fs.rmSync(bundleDir, { recursive: true, force: true });
+                        }
+                        fs.mkdirSync(bundleDir, { recursive: true });
+
+                        // Copy exiftool script and lib directory
+                        fs.copyFileSync(path.join(exifToolPath, 'exiftool'), path.join(bundleDir, 'exiftool'));
+
+                        // Copy lib directory recursively
+                        const libSrc = path.join(exifToolPath, 'lib');
+                        const libDest = path.join(bundleDir, 'lib');
+                        execSync(`cp -r "${libSrc}" "${libDest}"`, { stdio: 'inherit' });
+
+                        // Create a wrapper script
+                        const wrapperContent = `#!/bin/sh
 # ExifTool wrapper script for Tasaveer
 # This script invokes the Perl exiftool from the bundle directory
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BUNDLE_DIR="${'$'}{SCRIPT_DIR}/exiftool-bundle-${targetTriple}"
-exec perl "${'$'}{BUNDLE_DIR}/exiftool" "$@"
+BUNDLE_DIR="${'${'}SCRIPT_DIR}/exiftool-bundle-${targetTriple}"
+exec perl "${'${'}BUNDLE_DIR}/exiftool" "$@"
 `;
-                    fs.writeFileSync(outputPath, wrapperContent);
-                    fs.chmodSync(outputPath, 0o755);
+                        fs.writeFileSync(outputPath, wrapperContent);
+                        fs.chmodSync(outputPath, 0o755);
+                    }
+                }
+
+                console.log(`   ✓ ${outputName} ready`);
+            } finally {
+                // Cleanup
+                fs.rmSync(tempDir, { recursive: true, force: true });
+                if (fs.existsSync(archivePath)) {
+                    fs.unlinkSync(archivePath);
                 }
             }
-
-            console.log(`   ✓ ${outputName} ready`);
-        } finally {
-            // Cleanup
-            fs.rmSync(tempDir, { recursive: true, force: true });
-            if (fs.existsSync(archivePath)) {
-                fs.unlinkSync(archivePath);
+        } catch (err) {
+            console.error(`   ❌ Failed to download ExifTool for ${targetTriple}:`, err.message);
+            // Only throw error if it is critical for the current platform/macos build
+            const currentTriple = getCurrentTargetTriple();
+            const isMacosBuild = process.argv.includes('--macos');
+            if (targetTriple === currentTriple || (isMacosBuild && targetTriple.includes('apple-darwin'))) {
+                throw err;
             }
         }
     }
@@ -366,6 +386,7 @@ exec perl "${'$'}{BUNDLE_DIR}/exiftool" "$@"
 
 async function main() {
     const downloadAll = process.argv.includes('--all');
+    const downloadMacos = process.argv.includes('--macos');
 
     console.log('🚀 Tasaveer Binary Downloader\n');
 
@@ -382,6 +403,9 @@ async function main() {
         const immichGoTriples = Object.values(IMMICH_GO_MAPPINGS).map(m => m.targetTriple);
         const exifToolTriples = Object.values(EXIFTOOL_MAPPINGS).map(m => m.targetTriple);
         targetTriples = [...new Set([...immichGoTriples, ...exifToolTriples])];
+    } else if (downloadMacos) {
+        console.log('📋 Mode: Download macOS platforms only\n');
+        targetTriples = ['x86_64-apple-darwin', 'aarch64-apple-darwin'];
     } else {
         const currentTriple = getCurrentTargetTriple();
         console.log(`📋 Mode: Current platform (${currentTriple})\n`);

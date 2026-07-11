@@ -36,7 +36,7 @@ jobs:
         run: npm install
 
       - name: Download Sidecar Binaries
-        run: npm run download-deps:all
+        run: npm run download-deps:macos
 
       - name: Build and Publish Release
         uses: tauri-apps/tauri-action@v0
